@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function membershipId(companyId) {
+      return request.auth.uid + '_' + companyId;
+    }
+
+    function isCompanyMember(companyId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/memberships/$(membershipId(companyId)));
+    }
+
+    function isBoss(companyId) {
+      return isCompanyMember(companyId)
+        && get(/databases/$(database)/documents/memberships/$(membershipId(companyId))).data.role == 'boss';
+    }
+
+    match /users/{uid} {
+      allow read: if isSelf(uid);
+      allow create: if isSelf(uid)
+                    && request.resource.data.uid == request.auth.uid;
+      allow update: if isSelf(uid)
+                    && request.resource.data.uid == resource.data.uid;
+      allow delete: if false;
+    }
+
+    match /memberships/{mId} {
+      allow read: if isSignedIn()
+                  && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /companies/{companyId} {
+      allow read: if isCompanyMember(companyId);
+      allow create: if isSignedIn()
+                    && request.resource.data.ownerId == request.auth.uid
+                    && request.resource.data.companyId == companyId;
+      allow update: if isBoss(companyId);
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if isCompanyMember(companyId);
+        allow create, update, delete: if isBoss(companyId);
+      }
+
+match /invoices/{invoiceId} {
+  allow read: if isCompanyMember(companyId);
+  allow create, update: if isBoss(companyId);
+  allow delete: if false;
+}
+    }
+
+    match /users/{uid}/items/{itemId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+  }
+}

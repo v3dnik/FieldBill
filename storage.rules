@@ -1,0 +1,21 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ───────────────────────────────────────────
+    //  /companies/{companyId}/{filename}
+    // ───────────────────────────────────────────
+    match /companies/{companyId}/{filename} {
+      // Branje: dovoljeno za vse (logo bo viden na javnih računih)
+      allow read: if true;
+
+      // Pisanje: samo boss preko memberships preverbe
+      allow write: if request.auth != null
+                   && firestore.exists(/databases/(default)/documents/memberships/$(request.auth.uid + '_' + companyId))
+                   && firestore.get(/databases/(default)/documents/memberships/$(request.auth.uid + '_' + companyId)).data.role == 'boss'
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
