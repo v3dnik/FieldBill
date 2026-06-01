@@ -83,8 +83,8 @@ export default function DashboardLayout({
   // Loading screen
   if (authLoading || isLoadingData) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <p className="text-slate-400">Wird geladen...</p>
+      <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900">
+        <p className="text-gray-400 dark:text-slate-400">Wird geladen...</p>
       </main>
     );
   }
@@ -95,7 +95,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-white">
       {/* Navigacija (sidebar desktop + bottom nav mobile) */}
       <Navigation role={data.membership.role} />
 
