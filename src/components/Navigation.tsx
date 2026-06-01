@@ -13,7 +13,9 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Übersicht', icon: '🏠' },
-  { href: '/dashboard/rechnungen', label: 'Rechnungen', icon: '📋' },
+  { href: '/dashboard/rechnungen', label: 'Rechnungen', icon: '🧾' },
+  { href: '/dashboard/ausgaben', label: 'Ausgaben', icon: '💸' },
+  { href: '/dashboard/bilanz', label: 'Bilanz', icon: '📊' },
   { href: '/dashboard/firma', label: 'Firma', icon: '🏢', bossOnly: true },
   { href: '/dashboard/leistungen', label: 'Leistungen', icon: '📦' },
   { href: '/dashboard/mitarbeiter', label: 'Mitarbeiter', icon: '👥', bossOnly: true },

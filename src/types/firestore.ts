@@ -173,3 +173,29 @@ export type BalanceDoc = {
   };
   updatedAt: Timestamp;
 };
+// ─────────────────────────────────────────────
+//  EXPENSE DOCUMENT  →  /companies/{companyId}/expenses/{expenseId}
+// ─────────────────────────────────────────────
+
+export type ExpenseCategory =
+  | 'Material'
+  | 'Fahrzeug'
+  | 'Büro'
+  | 'Versicherung'
+  | 'Marketing'
+  | 'Personal'
+  | 'Miete'
+  | 'Telefon'
+  | 'Sonstiges';
+
+export type ExpenseDoc = {
+  expenseId: string;
+  amountRappen: number;        // Betrag in Rappen (CHF * 100)
+  date: Timestamp;             // Datum des Aufwands
+  category: ExpenseCategory;   // Kategorie
+  description: string;         // Beschreibung
+  receiptUrl?: string;         // Firebase Storage URL (Foto/PDF)
+  receiptStoragePath?: string; // Storage Pfad (für Delete)
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+};

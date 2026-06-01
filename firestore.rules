@@ -61,6 +61,12 @@ match /invoices/{invoiceId} {
   allow create, update: if isBoss(companyId);
   allow delete: if false;
 }
+// ───── EXPENSES (Ausgaben) ─────
+match /expenses/{expenseId} {
+  allow read: if isCompanyMember(companyId);
+  allow create, update: if isBoss(companyId);
+  allow delete: if false;
+}
     }
 
     match /users/{uid}/items/{itemId} {
