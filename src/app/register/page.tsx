@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, FormEvent, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import Image from 'next/image';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
+import { InvitationDoc } from '@/types/firestore';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signUp } = useAuth();
 
   const [firstName, setFirstName] = useState('');
@@ -19,6 +22,61 @@ export default function RegisterPage() {
   const [companyPhone, setCompanyPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Invite state
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [invitation, setInvitation] = useState<InvitationDoc | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [companyNameDisplay, setCompanyNameDisplay] = useState('');
+
+  // Preberi ?invite= parameter
+  useEffect(() => {
+    const token = searchParams.get('invite');
+    if (!token) return;
+    setInviteToken(token);
+    loadInvitation(token);
+  }, [searchParams]);
+
+  const loadInvitation = async (token: string) => {
+    setInviteLoading(true);
+    try {
+      // Poišči invitation po tokenu — shranjen v /invitations/{token}
+      const inviteSnap = await getDoc(doc(db, 'invitations', token));
+      if (!inviteSnap.exists()) {
+        setInviteError('Einladungslink ist ungültig oder abgelaufen.');
+        return;
+      }
+      const inv = inviteSnap.data() as InvitationDoc;
+
+      // Preveri če je že uporabljen
+      if (inv.used) {
+        setInviteError('Dieser Einladungslink wurde bereits verwendet.');
+        return;
+      }
+
+      // Preveri expiry
+      if (inv.expiresAt.toDate() < new Date()) {
+        setInviteError('Dieser Einladungslink ist abgelaufen (7 Tage).');
+        return;
+      }
+
+      // Naloži ime firme
+      const companySnap = await getDoc(doc(db, 'companies', inv.companyId));
+      if (companySnap.exists()) {
+        setCompanyNameDisplay(companySnap.data().name || '');
+      }
+
+      // Predizpolni email če je v invitaciji
+      if (inv.email) setEmail(inv.email);
+
+      setInvitation(inv);
+    } catch (err) {
+      setInviteError('Fehler beim Laden der Einladung.');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,46 +91,77 @@ export default function RegisterPage() {
 
     try {
       const firebaseUser = await signUp(email, password);
-      const companyId = firebaseUser.uid;
 
-      await setDoc(doc(db, 'users', firebaseUser.uid), {
-        uid: firebaseUser.uid,
-        email: email,
-        firstName: firstName,
-        lastName: lastName,
-        defaultCompanyId: companyId,
-        createdAt: serverTimestamp(),
-      });
+      if (invitation) {
+        // ── MITARBEITER REGISTRIERUNG (mit Einladung) ──
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          uid: firebaseUser.uid,
+          email,
+          firstName,
+          lastName,
+          defaultCompanyId: invitation.companyId,
+          createdAt: serverTimestamp(),
+        });
 
-      await setDoc(doc(db, 'companies', companyId), {
-        companyId: companyId,
-        ownerId: firebaseUser.uid,
-        name: companyName,
-        phone: companyPhone,
-        contactEmail: email,
-        address: { street: '', zip: '', city: '', country: 'CH' },
-        logoUrl: '',
-        logoStoragePath: '',
-        vatRate: 0.081,
-        currency: 'CHF',
-        invoiceSettings: {
-          numberTemplate: 'RE-{YYYY}-{NUM4}',
-          nextNumber: 1,
-          resetYearly: true,
-        },
-        createdAt: serverTimestamp(),
-      });
+        const membershipId = `${firebaseUser.uid}_${invitation.companyId}`;
+        await setDoc(doc(db, 'memberships', membershipId), {
+          membershipId,
+          uid: firebaseUser.uid,
+          companyId: invitation.companyId,
+          role: invitation.role,
+          active: true,
+          displayName: `${firstName} ${lastName}`,
+          joinedAt: serverTimestamp(),
+        });
 
-      const membershipId = `${firebaseUser.uid}_${companyId}`;
-      await setDoc(doc(db, 'memberships', membershipId), {
-        membershipId: membershipId,
-        uid: firebaseUser.uid,
-        companyId: companyId,
-        role: 'boss',
-        active: true,
-        displayName: `${firstName} ${lastName}`,
-        joinedAt: serverTimestamp(),
-      });
+        // Označimo invitation kot used
+        await updateDoc(doc(db, 'invitations', inviteToken!), {
+          used: true,
+          usedBy: firebaseUser.uid,
+        });
+
+      } else {
+        // ── BOSS REGISTRIERUNG (neue Firma) ──
+        const companyId = firebaseUser.uid;
+
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          uid: firebaseUser.uid,
+          email,
+          firstName,
+          lastName,
+          defaultCompanyId: companyId,
+          createdAt: serverTimestamp(),
+        });
+
+        await setDoc(doc(db, 'companies', companyId), {
+          companyId,
+          ownerId: firebaseUser.uid,
+          name: companyName,
+          phone: companyPhone,
+          contactEmail: email,
+          address: { street: '', zip: '', city: '', country: 'CH' },
+          logoUrl: '',
+          logoStoragePath: '',
+          vatRate: 0.081,
+          currency: 'CHF',
+          invoiceSettings: {
+            numberTemplate: 'RE-{YYYY}-{NUM4}',
+            nextNumber: 1,
+            resetYearly: true,
+          },
+          createdAt: serverTimestamp(),
+        });
+
+        await setDoc(doc(db, 'memberships', `${firebaseUser.uid}_${companyId}`), {
+          membershipId: `${firebaseUser.uid}_${companyId}`,
+          uid: firebaseUser.uid,
+          companyId,
+          role: 'boss',
+          active: true,
+          displayName: `${firstName} ${lastName}`,
+          joinedAt: serverTimestamp(),
+        });
+      }
 
       router.push('/dashboard');
     } catch (err) {
@@ -90,125 +179,143 @@ export default function RegisterPage() {
     }
   };
 
+  const inputClass = "w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors";
+  const labelClass = "block text-sm font-medium mb-2 text-gray-700 dark:text-slate-300";
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6">
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 p-6">
       <div className="w-full max-w-md">
+
+        {/* Logo + Title */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">FieldBill</h1>
-          <p className="text-slate-400">Firma registrieren</p>
+          <div className="flex justify-center mb-5">
+            <Image src="/fieldbill-logo.png" alt="FieldBill Logo" width={90} height={90}
+              priority className="rounded-2xl shadow-lg" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">FieldBill</h1>
+          <p className="text-gray-500 dark:text-slate-400">
+            {invitation ? `Einladung von ${companyNameDisplay}` : 'Firma registrieren'}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 bg-slate-800 p-6 rounded-lg border border-slate-700">
-          <h2 className="text-lg font-semibold border-b border-slate-700 pb-2">Ihre Daten</h2>
+        {/* Invite loading */}
+        {inviteLoading && (
+          <div className="text-center py-8 text-gray-400">Einladung wird geprüft...</div>
+        )}
 
-          <div className="grid grid-cols-2 gap-3">
+        {/* Invite error */}
+        {inviteError && (
+          <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-300 px-4 py-4 rounded-xl text-sm text-center mb-6">
+            <p className="text-2xl mb-2">⚠️</p>
+            <p>{inviteError}</p>
+            <Link href="/register" className="text-blue-500 hover:underline mt-2 inline-block">
+              Ohne Einladung registrieren
+            </Link>
+          </div>
+        )}
+
+        {/* Invite banner */}
+        {invitation && !inviteError && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl px-4 py-3 mb-6 text-center">
+            <p className="text-green-700 dark:text-green-300 text-sm font-medium">
+              🎉 Sie wurden eingeladen, bei <strong>{companyNameDisplay}</strong> als{' '}
+              <strong>{invitation.role === 'boss' ? 'Geschäftsführer' : 'Mitarbeiter'}</strong> beizutreten!
+            </p>
+          </div>
+        )}
+
+        {/* Form */}
+        {!inviteLoading && !inviteError && (
+          <form onSubmit={handleSubmit}
+            className="space-y-4 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+
+            {/* Ihre Daten */}
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-2">
+              Ihre Daten
+            </h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Vorname</label>
+                <input type="text" required value={firstName}
+                  onChange={e => setFirstName(e.target.value)}
+                  className={inputClass} disabled={isLoading} />
+              </div>
+              <div>
+                <label className={labelClass}>Nachname</label>
+                <input type="text" required value={lastName}
+                  onChange={e => setLastName(e.target.value)}
+                  className={inputClass} disabled={isLoading} />
+              </div>
+            </div>
+
             <div>
-              <label htmlFor="firstName" className="block text-sm font-medium mb-2 text-slate-300">Vorname</label>
-              <input
-                id="firstName"
-                type="text"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-blue-500"
-                disabled={isLoading}
-              />
+              <label className={labelClass}>E-Mail</label>
+              <input type="email" required value={email}
+                onChange={e => setEmail(e.target.value)}
+                className={inputClass} placeholder="name@firma.ch"
+                disabled={isLoading} />
             </div>
+
             <div>
-              <label htmlFor="lastName" className="block text-sm font-medium mb-2 text-slate-300">Nachname</label>
-              <input
-                id="lastName"
-                type="text"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-blue-500"
-                disabled={isLoading}
-              />
+              <label className={labelClass}>
+                Passwort <span className="text-xs text-gray-400 ml-1">(mind. 6 Zeichen)</span>
+              </label>
+              <input type="password" required minLength={6} value={password}
+                onChange={e => setPassword(e.target.value)}
+                className={inputClass} placeholder="••••••••"
+                disabled={isLoading} />
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2 text-slate-300">E-Mail</label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-blue-500"
-              placeholder="name@firma.ch"
-              disabled={isLoading}
-            />
-          </div>
+            {/* Ihre Firma — NUR ohne Einladung */}
+            {!invitation && (
+              <>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-2 pt-2">
+                  Ihre Firma
+                </h2>
+                <div>
+                  <label className={labelClass}>Firmenname</label>
+                  <input type="text" required value={companyName}
+                    onChange={e => setCompanyName(e.target.value)}
+                    className={inputClass} placeholder="z.B. Müller Umzüge GmbH"
+                    disabled={isLoading} />
+                </div>
+                <div>
+                  <label className={labelClass}>Telefon</label>
+                  <input type="tel" required value={companyPhone}
+                    onChange={e => setCompanyPhone(e.target.value)}
+                    className={inputClass} placeholder="+41 79 123 45 67"
+                    disabled={isLoading} />
+                </div>
+              </>
+            )}
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-2 text-slate-300">
-              Passwort <span className="text-xs text-slate-500 ml-2">(mind. 6 Zeichen)</span>
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-blue-500"
-              placeholder="••••••••"
-              disabled={isLoading}
-            />
-          </div>
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-200 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
 
-          <h2 className="text-lg font-semibold border-b border-slate-700 pb-2 pt-4">Ihre Firma</h2>
+            <button type="submit" disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors">
+              {isLoading ? 'Wird registriert...' : invitation ? 'Konto erstellen & beitreten' : 'Registrieren'}
+            </button>
+          </form>
+        )}
 
-          <div>
-            <label htmlFor="companyName" className="block text-sm font-medium mb-2 text-slate-300">Firmenname</label>
-            <input
-              id="companyName"
-              type="text"
-              required
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-blue-500"
-              placeholder="z.B. Müller Umzüge GmbH"
-              disabled={isLoading}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="companyPhone" className="block text-sm font-medium mb-2 text-slate-300">Telefon</label>
-            <input
-              id="companyPhone"
-              type="tel"
-              required
-              value={companyPhone}
-              onChange={(e) => setCompanyPhone(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-md text-white focus:outline-none focus:border-blue-500"
-              placeholder="+41 79 123 45 67"
-              disabled={isLoading}
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-900/30 border border-red-700 text-red-200 px-4 py-3 rounded-md text-sm">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium py-3 rounded-md transition-colors"
-          >
-            {isLoading ? 'Wird registriert...' : 'Registrieren'}
-          </button>
-        </form>
-
-        <p className="text-center mt-6 text-sm text-slate-400">
+        <p className="text-center mt-6 text-sm text-gray-500 dark:text-slate-400">
           Bereits ein Konto?{' '}
-          <Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+          <Link href="/login" className="text-blue-500 dark:text-blue-400 hover:underline font-medium">
             Anmelden
           </Link>
+        </p>
+
+        <p className="text-center mt-4 text-xs text-gray-400 dark:text-slate-600">
+          Entwickelt von{' '}
+          <a href="https://www.vodnik.ch" target="_blank" rel="noopener noreferrer"
+            className="text-blue-400 hover:underline">
+            Vodnik Digital Solutions
+          </a>
         </p>
       </div>
     </main>

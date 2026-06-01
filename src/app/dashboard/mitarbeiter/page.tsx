@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc, setDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { MembershipDoc, UserDoc, UserRole } from '@/types/firestore';
@@ -16,6 +16,11 @@ interface Mitarbeiter {
   joinedAt: Timestamp;
 }
 
+function generateToken(): string {
+  return Math.random().toString(36).substring(2, 10) +
+    Math.random().toString(36).substring(2, 10);
+}
+
 export default function MitarbeiterPage() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -24,15 +29,19 @@ export default function MitarbeiterPage() {
   const [mitarbeiter, setMitarbeiter] = useState<Mitarbeiter[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState<UserRole>('employee');
-  const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Invite state
+  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [inviteRole, setInviteRole] = useState<UserRole>('employee');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const showSuccess = (msg: string) => {
     setSuccess(msg);
-    setTimeout(() => setSuccess(''), 3000);
+    setTimeout(() => setSuccess(''), 4000);
   };
 
   const loadMitarbeiter = async (cId: string) => {
@@ -79,28 +88,56 @@ export default function MitarbeiterPage() {
           setIsBoss((membershipSnap.data() as MembershipDoc).role === 'boss');
         }
         await loadMitarbeiter(cId);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
+      } catch (err) { console.error(err); }
+      finally { setIsLoading(false); }
     };
     load();
   }, [user]);
 
+  // Generiraj invite link
+  const handleGenerateInvite = async () => {
+    setIsGenerating(true);
+    setError('');
+    try {
+      const token = generateToken();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 dni
+
+      await setDoc(doc(db, 'invitations', token), {
+        token,
+        companyId,
+        invitedBy: user!.uid,
+        email: inviteEmail.trim() || null,
+        role: inviteRole,
+        expiresAt: Timestamp.fromDate(expiresAt),
+        used: false,
+        usedBy: null,
+        createdAt: Timestamp.now(),
+      });
+
+      const baseUrl = window.location.origin;
+      const link = `${baseUrl}/register?invite=${token}`;
+      setGeneratedLink(link);
+    } catch (err) {
+      setError('Fehler beim Erstellen des Links.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(generatedLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleToggleActive = async (m: Mitarbeiter) => {
     if (!isBoss || m.uid === user?.uid) return;
     try {
-      await updateDoc(doc(db, 'memberships', `${m.uid}_${companyId}`), {
-        active: !m.active,
-      });
-      setMitarbeiter(prev =>
-        prev.map(p => p.uid === m.uid ? { ...p, active: !p.active } : p)
-      );
+      await updateDoc(doc(db, 'memberships', `${m.uid}_${companyId}`), { active: !m.active });
+      setMitarbeiter(prev => prev.map(p => p.uid === m.uid ? { ...p, active: !p.active } : p));
       showSuccess(`${m.firstName} wurde ${!m.active ? 'aktiviert' : 'deaktiviert'}.`);
-    } catch (err) {
-      setError('Fehler beim Aktualisieren.');
-    }
+    } catch { setError('Fehler beim Aktualisieren.'); }
   };
 
   const handleDelete = async (m: Mitarbeiter) => {
@@ -110,69 +147,7 @@ export default function MitarbeiterPage() {
       setMitarbeiter(prev => prev.filter(p => p.uid !== m.uid));
       setDeleteConfirm(null);
       showSuccess(`${m.firstName} ${m.lastName} wurde entfernt.`);
-    } catch (err) {
-      setError('Fehler beim Entfernen.');
-    }
-  };
-
-  const handleAddMitarbeiter = async () => {
-    setError('');
-    if (!newEmail.trim()) { setError('E-Mail ist erforderlich.'); return; }
-    setIsSaving(true);
-    try {
-      // Suche User mit dieser Email
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const existingUser = usersSnap.docs.find(d => d.data().email === newEmail.trim());
-
-      if (!existingUser) {
-        setError(`Kein Konto mit "${newEmail}" gefunden. Der Mitarbeiter muss sich zuerst unter /register registrieren.`);
-        setIsSaving(false);
-        return;
-      }
-
-      const existingUid = existingUser.id;
-      const membershipId = `${existingUid}_${companyId}`;
-      const existingMembership = await getDoc(doc(db, 'memberships', membershipId));
-
-      if (existingMembership.exists()) {
-        setError('Dieser Benutzer ist bereits Mitglied dieser Firma.');
-        setIsSaving(false);
-        return;
-      }
-
-      await setDoc(doc(db, 'memberships', membershipId), {
-        membershipId,
-        uid: existingUid,
-        companyId,
-        role: newRole,
-        active: true,
-        displayName: `${existingUser.data().firstName} ${existingUser.data().lastName}`,
-        joinedAt: Timestamp.now(),
-      });
-
-      // Setze defaultCompanyId beim User falls noch nicht gesetzt
-      const userData = existingUser.data() as UserDoc;
-      if (!userData.defaultCompanyId) {
-        await updateDoc(doc(db, 'users', existingUid), {
-          defaultCompanyId: companyId,
-        });
-      }
-
-      await loadMitarbeiter(companyId);
-      resetForm();
-      showSuccess('Mitarbeiter erfolgreich hinzugefügt!');
-    } catch (err: any) {
-      setError('Fehler: ' + (err?.message || 'Unbekannt'));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const resetForm = () => {
-    setShowForm(false);
-    setNewEmail('');
-    setNewRole('employee');
-    setError('');
+    } catch { setError('Fehler beim Entfernen.'); }
   };
 
   const roleLabel = (role: UserRole) => role === 'boss' ? 'Geschäftsführer' : 'Mitarbeiter';
@@ -209,10 +184,10 @@ export default function MitarbeiterPage() {
             {mitarbeiter.length} {mitarbeiter.length === 1 ? 'Person' : 'Personen'} im Team
           </p>
         </div>
-        {!showForm && (
-          <button onClick={() => setShowForm(true)}
+        {!showInviteForm && (
+          <button onClick={() => { setShowInviteForm(true); setGeneratedLink(''); }}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-            + Hinzufügen
+            + Einladen
           </button>
         )}
       </div>
@@ -223,77 +198,105 @@ export default function MitarbeiterPage() {
           ✓ {success}
         </div>
       )}
+      {error && (
+        <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-300 px-4 py-3 rounded-xl text-sm">
+          {error}
+          <button onClick={() => setError('')} className="ml-2 text-red-400">✕</button>
+        </div>
+      )}
 
-      {/* Hinzufügen Form */}
-      {showForm && (
+      {/* Invite Form */}
+      {showInviteForm && (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Mitarbeiter hinzufügen
+            Einladungslink erstellen
           </h2>
-
-          {/* Info box */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3 mb-4">
-            <p className="text-blue-700 dark:text-blue-300 text-sm">
-              ℹ️ Der Mitarbeiter muss bereits ein FieldBill-Konto haben.
-              Falls nicht → zuerst auf <strong>/register</strong> registrieren,
-              danach hier hinzufügen.
-            </p>
-          </div>
-
-          {error && (
-            <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-              {error}
-              <button onClick={() => setError('')} className="ml-2 text-red-400 hover:text-red-600">✕</button>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                E-Mail des Mitarbeiters <span className="text-red-500">*</span>
+                Rolle
               </label>
-              <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                className={inputClass} placeholder="mitarbeiter@email.ch" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Rolle <span className="text-red-500">*</span>
-              </label>
-              <select value={newRole} onChange={e => setNewRole(e.target.value as UserRole)}
+              <select value={inviteRole} onChange={e => setInviteRole(e.target.value as UserRole)}
                 className={inputClass}>
                 <option value="employee">Mitarbeiter</option>
                 <option value="boss">Geschäftsführer</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                E-Mail <span className="text-gray-400 text-xs">(optional)</span>
+              </label>
+              <input type="email" value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                className={inputClass} placeholder="mitarbeiter@email.ch" />
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            <button onClick={handleAddMitarbeiter} disabled={isSaving}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors">
-              {isSaving ? 'Wird gespeichert...' : 'Hinzufügen'}
-            </button>
-            <button onClick={resetForm}
-              className="px-6 py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-white font-medium text-sm rounded-lg transition-colors">
-              Abbrechen
-            </button>
-          </div>
+          {/* Generierter Link */}
+          {generatedLink ? (
+            <div className="space-y-3">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3">
+                <p className="text-green-700 dark:text-green-300 text-xs font-medium mb-2">
+                  ✓ Link erstellt — gültig für 7 Tage
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 break-all font-mono bg-white dark:bg-slate-900 rounded p-2">
+                  {generatedLink}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleCopyLink}
+                  className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                    copied
+                      ? 'bg-green-600 text-white'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}>
+                  {copied ? '✓ Kopiert!' : '📋 Link kopieren'}
+                </button>
+                <button onClick={() => {
+                  setShowInviteForm(false);
+                  setGeneratedLink('');
+                  setInviteEmail('');
+                  setInviteRole('employee');
+                }}
+                  className="px-4 py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-white text-sm rounded-lg transition-colors">
+                  Schliessen
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-slate-500">
+                💡 Senden Sie diesen Link per WhatsApp, SMS oder E-Mail an den Mitarbeiter.
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button onClick={handleGenerateInvite} disabled={isGenerating}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors">
+                {isGenerating ? 'Wird erstellt...' : '🔗 Link generieren'}
+              </button>
+              <button onClick={() => setShowInviteForm(false)}
+                className="px-6 py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-white font-medium text-sm rounded-lg transition-colors">
+                Abbrechen
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Liste */}
+      {/* Mitarbeiter Liste */}
       {mitarbeiter.length === 0 ? (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-12 text-center">
           <p className="text-4xl mb-3">👥</p>
-          <p className="text-gray-500 dark:text-slate-400">Noch keine Mitarbeiter erfasst.</p>
+          <p className="text-gray-500 dark:text-slate-400 mb-2">Noch keine Mitarbeiter erfasst.</p>
+          <p className="text-gray-400 dark:text-slate-500 text-sm">
+            Klicken Sie auf "+ Einladen" um einen Link zu generieren.
+          </p>
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
           {mitarbeiter.map((m, idx) => (
             <div key={m.uid}
               className={`p-4 ${idx > 0 ? 'border-t border-gray-100 dark:border-slate-700' : ''} ${!m.active ? 'opacity-50' : ''}`}>
-
               <div className="flex items-center justify-between gap-4">
-                {/* Avatar + Info */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                     {m.firstName?.[0]?.toUpperCase() || m.email[0].toUpperCase()}
@@ -319,7 +322,6 @@ export default function MitarbeiterPage() {
                   </div>
                 </div>
 
-                {/* Actions */}
                 {m.uid !== user?.uid && (
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button onClick={() => handleToggleActive(m)}
@@ -334,7 +336,6 @@ export default function MitarbeiterPage() {
                 )}
               </div>
 
-              {/* Delete confirm */}
               {deleteConfirm === m.uid && (
                 <div className="mt-3 pt-3 border-t border-red-100 dark:border-red-900/30 flex items-center gap-3 flex-wrap">
                   <p className="text-sm text-red-600 dark:text-red-400 flex-1">
@@ -355,7 +356,6 @@ export default function MitarbeiterPage() {
         </div>
       )}
 
-      {/* Info footer */}
       <div className="mt-6 bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl p-4">
         <p className="text-xs text-gray-400 dark:text-slate-500 text-center">
           Geschäftsführer haben vollen Zugriff. Mitarbeiter können nur eigene Einträge erstellen.
