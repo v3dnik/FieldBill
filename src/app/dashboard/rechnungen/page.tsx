@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { InvoiceDoc } from '@/types/firestore';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  draft:     { label: 'Entwurf',    color: 'text-gray-400 bg-gray-700' },
-  issued:    { label: 'Ausgestellt', color: 'text-blue-400 bg-blue-900/40' },
-  paid:      { label: 'Bezahlt',    color: 'text-green-400 bg-green-900/40' },
-  cancelled: { label: 'Storniert',  color: 'text-red-400 bg-red-900/40' },
+  draft:     { label: 'Entwurf',    color: 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-700' },
+  issued:    { label: 'Ausgestellt', color: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/40' },
+  paid:      { label: 'Bezahlt',    color: 'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/40' },
+  cancelled: { label: 'Storniert',  color: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/40' },
 };
 
 function formatCHF(rappen: number) {
@@ -30,44 +30,31 @@ export default function RechnungenPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [companyId, setCompanyId] = useState('');
   const [filter, setFilter] = useState<string>('all');
 
   useEffect(() => {
     if (!user) return;
-
     const init = async () => {
       const userSnap = await getDoc(doc(db, 'users', user.uid));
       if (!userSnap.exists()) return;
       const cId = userSnap.data().defaultCompanyId;
-      setCompanyId(cId);
 
       const q = query(
         collection(db, 'companies', cId, 'invoices'),
         orderBy('createdAt', 'desc')
       );
-
       const unsub = onSnapshot(q, snap => {
-        const data = snap.docs.map(d => ({ ...d.data(), invoiceId: d.id } as InvoiceDoc));
-        setInvoices(data);
+        setInvoices(snap.docs.map(d => ({ ...d.data(), invoiceId: d.id } as InvoiceDoc)));
         setLoading(false);
       });
-
       return unsub;
     };
-
     init();
   }, [user]);
 
   const filtered = filter === 'all' ? invoices : invoices.filter(i => i.status === filter);
-
-  const totalOpen = invoices
-    .filter(i => i.status === 'issued')
-    .reduce((sum, i) => sum + i.totalRappen, 0);
-
-  const totalPaid = invoices
-    .filter(i => i.status === 'paid')
-    .reduce((sum, i) => sum + i.totalRappen, 0);
+  const totalOpen = invoices.filter(i => i.status === 'issued').reduce((s, i) => s + i.totalRappen, 0);
+  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalRappen, 0);
 
   return (
     <div className="px-4 py-8 max-w-4xl mx-auto">
@@ -75,8 +62,8 @@ export default function RechnungenPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Rechnungen</h1>
-          <p className="text-gray-400 mt-1">Ihre Rechnungen und Zahlungen.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Rechnungen</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Ihre Rechnungen und Zahlungen.</p>
         </div>
         <button
           onClick={() => router.push('/dashboard/rechnungen/neu')}
@@ -89,13 +76,13 @@ export default function RechnungenPage() {
       {/* Stats */}
       {!loading && invoices.length > 0 && (
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-gray-800 rounded-xl p-4">
-            <p className="text-gray-400 text-sm">Offen</p>
-            <p className="text-white text-xl font-bold mt-1">{formatCHF(totalOpen)}</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Offen</p>
+            <p className="text-gray-900 dark:text-white text-xl font-bold mt-1">{formatCHF(totalOpen)}</p>
           </div>
-          <div className="bg-gray-800 rounded-xl p-4">
-            <p className="text-gray-400 text-sm">Bezahlt</p>
-            <p className="text-green-400 text-xl font-bold mt-1">{formatCHF(totalPaid)}</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">Bezahlt</p>
+            <p className="text-green-600 dark:text-green-400 text-xl font-bold mt-1">{formatCHF(totalPaid)}</p>
           </div>
         </div>
       )}
@@ -110,7 +97,7 @@ export default function RechnungenPage() {
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 filter === f
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               {f === 'all' ? 'Alle' : STATUS_LABELS[f]?.label}
@@ -123,8 +110,8 @@ export default function RechnungenPage() {
       {loading ? (
         <div className="text-gray-400 text-center py-12">Wird geladen...</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-gray-800 rounded-xl p-12 text-center">
-          <p className="text-gray-400 text-lg">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center">
+          <p className="text-gray-500 dark:text-gray-400 text-lg">
             {filter === 'all' ? 'Noch keine Rechnungen.' : 'Keine Rechnungen in dieser Kategorie.'}
           </p>
           {filter === 'all' && (
@@ -141,23 +128,25 @@ export default function RechnungenPage() {
           {filtered.map(invoice => (
             <div
               key={invoice.invoiceId}
-              className="bg-gray-800 rounded-xl p-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
+                         rounded-xl p-4 flex items-center justify-between 
+                         hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="text-white font-semibold">{invoice.invoiceNumber}</span>
+                  <span className="text-gray-900 dark:text-white font-semibold">{invoice.invoiceNumber}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_LABELS[invoice.status]?.color}`}>
                     {STATUS_LABELS[invoice.status]?.label}
                   </span>
                 </div>
-                <p className="text-gray-300 text-sm truncate">{invoice.customerName}</p>
-                <p className="text-gray-500 text-xs mt-0.5">{formatDate(invoice.issueDate)}</p>
+                <p className="text-gray-600 dark:text-gray-300 text-sm truncate">{invoice.customerName}</p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs mt-0.5">{formatDate(invoice.issueDate)}</p>
               </div>
               <div className="text-right ml-4">
-                <p className="text-white font-bold">{formatCHF(invoice.totalRappen)}</p>
+                <p className="text-gray-900 dark:text-white font-bold">{formatCHF(invoice.totalRappen)}</p>
                 <button
                   onClick={() => router.push(`/dashboard/rechnungen/${invoice.invoiceId}`)}
-                  className="text-blue-400 hover:text-blue-300 text-sm mt-1"
+                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm mt-1"
                 >
                   Öffnen
                 </button>
