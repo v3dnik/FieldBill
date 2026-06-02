@@ -28,23 +28,20 @@ type NavigationProps = {
   role: UserRole;
 };
 
-// ── ThemeToggle (inline, ne potrebuje ločene datoteke) ──────────────────────
 function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
-
   const isDark = theme === 'dark';
 
   if (compact) {
-    // Mala okrogla verzija za mobile
     return (
       <button
         onClick={() => setTheme(isDark ? 'light' : 'dark')}
         className="w-9 h-9 flex items-center justify-center rounded-full
-                   bg-slate-700 hover:bg-slate-600 dark:bg-slate-600 dark:hover:bg-slate-500
-                   transition-colors shadow-md"
+                   bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600
+                   transition-colors"
         title="Tema umschalten"
       >
         <span className="text-base">{isDark ? '☀️' : '🌙'}</span>
@@ -52,15 +49,12 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
     );
   }
 
-  // Široka verzija za sidebar
   return (
     <button
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium
-                 text-slate-300 hover:bg-slate-700 hover:text-white
-                 dark:text-slate-300 dark:hover:bg-slate-700
-                 transition-colors"
-      title="Tema umschalten"
+                 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700
+                 hover:text-gray-900 dark:hover:text-white transition-colors"
     >
       <span className="text-lg">{isDark ? '☀️' : '🌙'}</span>
       <span>{isDark ? 'Helles Design' : 'Dunkles Design'}</span>
@@ -68,17 +62,19 @@ function ThemeToggle({ compact = false }: { compact?: boolean }) {
   );
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-
 export default function Navigation({ role }: NavigationProps) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const items = NAV_ITEMS.filter((item) => !item.bossOnly || role === 'boss');
+  const items = NAV_ITEMS.filter(item => !item.bossOnly || role === 'boss');
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
     return pathname.startsWith(href);
   };
+
+  // Zapri meni ob navigaciji
+  const handleNavClick = () => setMobileOpen(false);
 
   return (
     <>
@@ -93,55 +89,97 @@ export default function Navigation({ role }: NavigationProps) {
 
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
+          {items.map(item => (
+            <Link key={item.href} href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
                 isActive(item.href)
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
+              }`}>
               <span className="text-lg">{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ))}
         </nav>
 
-        {/* ── Sidebar Footer: ThemeToggle ── */}
+        {/* Theme toggle */}
         <div className="px-3 py-4 border-t border-gray-200 dark:border-slate-700">
           <ThemeToggle />
         </div>
       </aside>
 
-      {/* ═══════ MOBILE: ThemeToggle gumb (zgoraj desno, nad content) ═══════ */}
-      <div className="md:hidden fixed top-3 right-3 z-50">
-        <ThemeToggle compact />
-      </div>
+      {/* ═══════ MOBILE HEADER ═══════ */}
+      <header className="md:hidden fixed top-0 inset-x-0 z-50
+                         bg-white dark:bg-slate-800
+                         border-b border-gray-200 dark:border-slate-700
+                         flex items-center justify-between px-4 h-14">
+        {/* Logo */}
+        <h1 className="text-lg font-bold text-gray-900 dark:text-white">FieldBill</h1>
 
-      {/* ═══════ MOBILE BOTTOM NAV ═══════ */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 z-40">
-        <div
-          className="grid gap-1 px-2 py-2"
-          style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
-        >
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-colors ${
-                isActive(item.href)
-                  ? 'text-blue-500 dark:text-blue-400'
-                  : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <span className="text-xl">{item.icon}</span>
-              <span className="text-[10px] leading-tight">{item.label}</span>
-            </Link>
-          ))}
+        {/* Right side: ThemeToggle + Hamburger */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle compact />
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg
+                       bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600
+                       transition-colors"
+            aria-label="Menü öffnen"
+          >
+            {mobileOpen ? (
+              // X icon
+              <svg className="w-5 h-5 text-gray-700 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              // Hamburger icon
+              <svg className="w-5 h-5 text-gray-700 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
-      </nav>
+      </header>
+
+      {/* ═══════ MOBILE MENU OVERLAY ═══════ */}
+      {mobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          {/* Slide-in menu */}
+          <div className="md:hidden fixed top-14 right-0 bottom-0 z-50 w-72
+                          bg-white dark:bg-slate-800
+                          border-l border-gray-200 dark:border-slate-700
+                          shadow-2xl flex flex-col">
+
+            {/* Nav links */}
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+              {items.map(item => (
+                <Link key={item.href} href={item.href} onClick={handleNavClick}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                    isActive(item.href)
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
+                  }`}>
+                  <span className="text-xl">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+
+            {/* Footer */}
+            <div className="px-3 py-4 border-t border-gray-200 dark:border-slate-700">
+              <p className="text-xs text-gray-400 dark:text-slate-500 text-center">
+                FieldBill — Vodnik Digital Solutions
+              </p>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

@@ -102,7 +102,7 @@ export default function DashboardLayout({
       {/* Glavni content prostor */}
       <div className="md:pl-64">
         {/* Padding-bottom za mobile bottom nav */}
-        <main className="pb-20 md:pb-0">
+        <main className="pt-14 md:pt-0">
           {children}
         </main>
       </div>
