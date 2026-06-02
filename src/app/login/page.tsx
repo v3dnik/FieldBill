@@ -208,12 +208,17 @@ export default function LoginPage() {
           </div>
         )}
 
-        <p className="text-center mt-6 text-sm text-gray-500 dark:text-slate-400">
-          Noch kein Konto?{' '}
-          <Link href="/register" className="text-blue-500 dark:text-blue-400 hover:underline font-medium">
-            Firma registrieren
-          </Link>
-        </p>
+        <div className="mt-6 space-y-2 text-center text-sm text-gray-500 dark:text-slate-400">
+          <p>
+            Neue Firma?{' '}
+            <Link href="/register" className="text-blue-500 dark:text-blue-400 hover:underline font-medium">
+              Jetzt registrieren
+            </Link>
+          </p>
+          <p className="text-xs text-gray-400 dark:text-slate-500">
+            Mitarbeiter? Registrierung nur mit Einladungslink vom Chef möglich.
+          </p>
+        </div>
 
         <p className="text-center mt-4 text-xs text-gray-400 dark:text-slate-600">
           Entwickelt von{' '}
