@@ -11,12 +11,6 @@ function formatCHF(rappen: number) {
   return 'CHF ' + (rappen / 100).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatCHFShort(rappen: number) {
-  const chf = rappen / 100;
-  if (Math.abs(chf) >= 1000) return `${(chf / 1000).toFixed(1)}k`;
-  return chf.toFixed(0);
-}
-
 const MONATE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 const MONATE_SHORT = ['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 
@@ -40,6 +34,7 @@ export default function BilanzPage() {
   const [company, setCompany] = useState<CompanyDoc | null>(null);
   const [exportingYear, setExportingYear] = useState(false);
   const [exportingMonth, setExportingMonth] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [prevYearData, setPrevYearData] = useState<MonthData[]>([]);
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<any>(null);
@@ -100,6 +95,7 @@ export default function BilanzPage() {
 
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
+    setSelectedMonth(null);
     const curr = calcMonthly(allInvoices, allExpenses, year);
     const prev = calcMonthly(allInvoices, allExpenses, year - 1);
     setMonthlyData(curr);
@@ -110,7 +106,6 @@ export default function BilanzPage() {
   useEffect(() => {
     if (!chartRef.current || monthlyData.length === 0) return;
     if (chartInstance.current) chartInstance.current.destroy();
-
     const isDark = theme === 'dark';
     const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
     const textColor = isDark ? '#9ca3af' : '#6b7280';
@@ -141,6 +136,11 @@ export default function BilanzPage() {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          onClick: (_, elements) => {
+            if (elements.length > 0) {
+              setSelectedMonth(elements[0].index);
+            }
+          },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -150,23 +150,12 @@ export default function BilanzPage() {
             },
           },
           scales: {
-            x: {
-              grid: { color: gridColor },
-              ticks: { color: textColor, font: { size: 11 }, maxRotation: 0 },
-            },
-            y: {
-              grid: { color: gridColor },
-              ticks: {
-                color: textColor,
-                font: { size: 11 },
-                callback: (v) => `${Number(v).toLocaleString('de-CH')}`,
-              },
-            },
+            x: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, maxRotation: 0 } },
+            y: { grid: { color: gridColor }, ticks: { color: textColor, font: { size: 11 }, callback: (v) => `${Number(v).toLocaleString('de-CH')}` } },
           },
         },
       });
     });
-
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
   }, [monthlyData, theme]);
 
@@ -263,22 +252,22 @@ export default function BilanzPage() {
     pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(156, 163, 175);
     pdf.text('Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.', 14, finalY);
     pdf.text('Entwickelt von Vodnik Digital Solutions — vodnik.ch', pageWidth / 2, finalY + 6, { align: 'center' });
-
     pdf.save(type === 'year' ? `FieldBill_Jahresbilanz_${selectedYear}.pdf` : `FieldBill_Monatsbilanz_${MONATE[month!]}_${selectedYear}.pdf`);
   };
 
   const handleExportYear = async () => { setExportingYear(true); await exportPDF('year'); setExportingYear(false); };
   const handleExportMonth = async (month: number) => { setExportingMonth(month); await exportPDF('month', month); setExportingMonth(null); };
 
+  const selectedMonthData = selectedMonth !== null ? monthlyData[selectedMonth] : null;
+  const einTrend = trendPct(totalEinnahmen, prevTotalEinnahmen);
+  const ausTrend = trendPct(totalAusgaben, prevTotalAusgaben);
+  const nettoTrend = trendPct(totalNetto, prevTotalNetto);
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="text-gray-400">Wird geladen...</div>
     </div>
   );
-
-  const einTrend = trendPct(totalEinnahmen, prevTotalEinnahmen);
-  const ausTrend = trendPct(totalAusgaben, prevTotalAusgaben);
-  const nettoTrend = trendPct(totalNetto, prevTotalNetto);
 
   return (
     <div className="px-4 py-6 max-w-4xl mx-auto space-y-6">
@@ -303,7 +292,6 @@ export default function BilanzPage() {
 
       {/* KPI Kartice */}
       <div className="grid grid-cols-3 gap-3">
-        {/* Einnahmen */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Einnahmen {selectedYear}</p>
           <p className="text-xl font-bold text-green-600 dark:text-green-400">{formatCHF(totalEinnahmen)}</p>
@@ -313,8 +301,6 @@ export default function BilanzPage() {
             </p>
           )}
         </div>
-
-        {/* Ausgaben */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ausgaben {selectedYear}</p>
           <p className="text-xl font-bold text-red-600 dark:text-red-400">{formatCHF(totalAusgaben)}</p>
@@ -324,8 +310,6 @@ export default function BilanzPage() {
             </p>
           )}
         </div>
-
-        {/* Netto */}
         <div className={`rounded-xl p-4 border ${totalNetto >= 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-500/30' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-500/30'}`}>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Netto {selectedYear}</p>
           <p className={`text-xl font-bold ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -342,14 +326,17 @@ export default function BilanzPage() {
       {/* Chart */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Monatliche Uebersicht</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Monatliche Uebersicht
+            <span className="text-xs text-gray-400 dark:text-gray-500 ml-2 font-normal">Tippen Sie auf einen Balken</span>
+          </p>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-green-600 dark:bg-green-500"></div>
+              <div className="w-3 h-3 rounded-sm bg-green-600"></div>
               <span className="text-xs text-gray-500 dark:text-gray-400">Einnahmen</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-red-600 dark:bg-red-500"></div>
+              <div className="w-3 h-3 rounded-sm bg-red-600"></div>
               <span className="text-xs text-gray-500 dark:text-gray-400">Ausgaben</span>
             </div>
           </div>
@@ -359,64 +346,104 @@ export default function BilanzPage() {
         </div>
       </div>
 
-      {/* Tabela */}
+      {/* Monatsliste — klikni za detail */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Detailansicht</p>
+        <div className="px-5 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Monatsübersicht</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Monat antippen für Details</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-700/50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Monat</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Einnahmen</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausgaben</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Netto</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthlyData.map((m, idx) => {
-                const hasData = m.einnahmenRappen > 0 || m.ausgabenRappen > 0;
-                return (
-                  <tr key={idx}
-                    className={`border-t border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${!hasData ? 'opacity-40' : ''}`}>
-                    <td className="px-5 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                      {MONATE[m.month]}
-                    </td>
-                    <td className="px-5 py-3 text-sm text-right text-green-600 dark:text-green-400 whitespace-nowrap">
-                      {m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-sm text-right text-red-600 dark:text-red-400 whitespace-nowrap">
-                      {m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—'}
-                    </td>
-                    <td className={`px-5 py-3 text-sm text-right font-medium whitespace-nowrap ${m.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {hasData ? formatCHF(m.nettoRappen) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right whitespace-nowrap">
-                      {hasData ? (
-                        <button onClick={() => handleExportMonth(m.month)} disabled={exportingMonth === m.month}
-                          className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors">
-                          {exportingMonth === m.month ? '...' : 'PDF'}
-                        </button>
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50">
-                <td className="px-5 py-4 text-sm font-bold text-gray-900 dark:text-white">Total {selectedYear}</td>
-                <td className="px-5 py-4 text-sm font-bold text-right text-green-600 dark:text-green-400 whitespace-nowrap">{formatCHF(totalEinnahmen)}</td>
-                <td className="px-5 py-4 text-sm font-bold text-right text-red-600 dark:text-red-400 whitespace-nowrap">{formatCHF(totalAusgaben)}</td>
-                <td className={`px-5 py-4 text-sm font-bold text-right whitespace-nowrap ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{formatCHF(totalNetto)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
+
+        {monthlyData.map((m, idx) => {
+          const hasData = m.einnahmenRappen > 0 || m.ausgabenRappen > 0;
+          const isSelected = selectedMonth === idx;
+          return (
+            <div key={idx}>
+              {/* Monatszeile */}
+              <div
+                onClick={() => setSelectedMonth(isSelected ? null : idx)}
+                className={`flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700/50 cursor-pointer transition-colors ${
+                  isSelected
+                    ? 'bg-blue-50 dark:bg-blue-900/20'
+                    : hasData
+                      ? 'hover:bg-gray-50 dark:hover:bg-gray-700/30'
+                      : 'opacity-40'
+                }`}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <span className={`text-sm font-medium ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    {MONATE[m.month]}
+                  </span>
+                  {hasData && (
+                    <div className="flex gap-3 text-xs">
+                      <span className="text-green-600 dark:text-green-400">
+                        {m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—'}
+                      </span>
+                      <span className="text-red-600 dark:text-red-400">
+                        {m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {hasData && (
+                    <span className={`text-sm font-medium ${m.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {m.nettoRappen >= 0 ? '+' : ''}{formatCHF(m.nettoRappen)}
+                    </span>
+                  )}
+                  {hasData && (
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isSelected ? 'rotate-90' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+
+              {/* Detail panel */}
+              {isSelected && selectedMonthData && (
+                <div className="px-5 py-4 bg-gray-50 dark:bg-gray-700/30 border-b border-gray-200 dark:border-gray-700">
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Einnahmen</p>
+                      <p className="text-sm font-bold text-green-600 dark:text-green-400">
+                        {selectedMonthData.einnahmenRappen > 0 ? formatCHF(selectedMonthData.einnahmenRappen) : '—'}
+                      </p>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ausgaben</p>
+                      <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                        {selectedMonthData.ausgabenRappen > 0 ? formatCHF(selectedMonthData.ausgabenRappen) : '—'}
+                      </p>
+                    </div>
+                    <div className={`rounded-lg p-3 text-center border ${selectedMonthData.nettoRappen >= 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'}`}>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Netto</p>
+                      <p className={`text-sm font-bold ${selectedMonthData.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {formatCHF(selectedMonthData.nettoRappen)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleExportMonth(selectedMonthData.month)}
+                    disabled={exportingMonth === selectedMonthData.month}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                    {exportingMonth === selectedMonthData.month ? 'Exportiert...' : `${MONATE[selectedMonthData.month]} PDF exportieren`}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Total */}
+        <div className="px-5 py-4 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between">
+          <span className="text-sm font-bold text-gray-900 dark:text-white">Total {selectedYear}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-green-600 dark:text-green-400">{formatCHF(totalEinnahmen)}</span>
+            <span className="text-xs text-red-600 dark:text-red-400">{formatCHF(totalAusgaben)}</span>
+            <span className={`text-sm font-bold ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {totalNetto >= 0 ? '+' : ''}{formatCHF(totalNetto)}
+            </span>
+          </div>
         </div>
       </div>
 
