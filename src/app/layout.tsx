@@ -18,6 +18,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="de" suppressHydrationWarning>
+      <head>
+        <meta name="vercel-toolbar" content="false" />
+      </head>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
