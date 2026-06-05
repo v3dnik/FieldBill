@@ -11,20 +11,23 @@ import { useAuth } from '@/lib/auth-context';
 import { ExpenseDoc, ExpenseCategory, MembershipDoc } from '@/types/firestore';
 
 const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
-  Material:     'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/30',
-  Fahrzeug:     'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30',
-  Büro:         'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/30',
-  Versicherung: 'text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-900/30',
-  Marketing:    'text-pink-600 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/30',
-  Personal:     'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/30',
-  Miete:        'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30',
-  Telefon:      'text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/30',
-  Sonstiges:    'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700',
+  Material:               'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/30',
+  Fahrzeug:               'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30',
+  Büro:                   'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-900/30',
+  Versicherung:           'text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-900/30',
+  Marketing:              'text-pink-600 bg-pink-50 dark:text-pink-400 dark:bg-pink-900/30',
+  Personal:               'text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-900/30',
+  Miete:                  'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/30',
+  Telefon:                'text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/30',
+  'Zinsen & Bankgebühren':'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-900/30',
+  Abschreibungen:         'text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-900/30',
+  Sonstiges:              'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700',
 };
 
 const KATEGORIEN: ExpenseCategory[] = [
   'Material', 'Fahrzeug', 'Büro', 'Versicherung',
-  'Marketing', 'Personal', 'Miete', 'Telefon', 'Sonstiges'
+  'Marketing', 'Personal', 'Miete', 'Telefon',
+  'Zinsen & Bankgebühren', 'Abschreibungen', 'Sonstiges'
 ];
 
 function formatCHF(rappen: number) {
@@ -52,7 +55,6 @@ export default function AusgabenPage() {
   const [filter, setFilter] = useState<string>('all');
   const [isBoss, setIsBoss] = useState(false);
 
-  // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBetrag, setEditBetrag] = useState('');
   const [editDatum, setEditDatum] = useState('');
@@ -60,7 +62,6 @@ export default function AusgabenPage() {
   const [editBeschreibung, setEditBeschreibung] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
-  // Delete state
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -71,21 +72,13 @@ export default function AusgabenPage() {
       if (!userSnap.exists()) return;
       const cId = userSnap.data().defaultCompanyId;
       setCompanyId(cId);
-
-      // Preveri vlogo
       const membershipSnap = await getDoc(doc(db, 'memberships', `${user.uid}_${cId}`));
-      const role = membershipSnap.exists()
-        ? (membershipSnap.data() as MembershipDoc).role
-        : 'employee';
+      const role = membershipSnap.exists() ? (membershipSnap.data() as MembershipDoc).role : 'employee';
       setIsBoss(role === 'boss');
-
       const q = query(collection(db, 'companies', cId, 'expenses'), orderBy('date', 'desc'));
       const unsub = onSnapshot(q, snap => {
         let all = snap.docs.map(d => ({ ...d.data(), expenseId: d.id } as ExpenseDoc));
-        // Employee vidi samo svoje
-        if (role !== 'boss') {
-          all = all.filter(e => (e as any).createdBy === user.uid);
-        }
+        if (role !== 'boss') all = all.filter(e => (e as any).createdBy === user.uid);
         setExpenses(all);
         setLoading(false);
       });
@@ -94,7 +87,6 @@ export default function AusgabenPage() {
     init();
   }, [user]);
 
-  // Edit
   const startEdit = (expense: ExpenseDoc) => {
     setEditingId(expense.expenseId);
     setEditBetrag((expense.amountRappen / 100).toFixed(2));
@@ -121,7 +113,6 @@ export default function AusgabenPage() {
     finally { setEditSaving(false); }
   };
 
-  // Delete
   const handleDelete = async (expenseId: string) => {
     if (!companyId) return;
     setDeleting(true);
@@ -251,7 +242,7 @@ export default function AusgabenPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[expense.category]}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[expense.category] || 'text-gray-600 bg-gray-100'}`}>
                         {expense.category}
                       </span>
                       <span className="text-gray-400 dark:text-gray-500 text-xs">{formatDate(expense.date)}</span>
@@ -267,13 +258,11 @@ export default function AusgabenPage() {
                   <div className="flex items-center gap-2 ml-3 flex-shrink-0">
                     <p className="text-red-600 dark:text-red-400 font-bold text-sm">{formatCHF(expense.amountRappen)}</p>
                     <button onClick={() => startEdit(expense)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                      title="Bearbeiten">
+                      className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
                       ✏️
                     </button>
                     <button onClick={() => setDeleteConfirm(expense.expenseId)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                      title="Loeschen">
+                      className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
                       🗑️
                     </button>
                   </div>
