@@ -145,7 +145,7 @@ export default function BilanzPage() {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: (ctx) => ` ${ctx.dataset.label}: CHF ${ctx.parsed.y.toLocaleString('de-CH', { minimumFractionDigits: 2 })}`,
+                label: (ctx) => ` ${ctx.dataset.label}: CHF ${(ctx.parsed.y ?? 0).toLocaleString('de-CH', { minimumFractionDigits: 2 })}`,
               },
             },
           },
