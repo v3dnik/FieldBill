@@ -24,6 +24,7 @@ export default function FirmenprofilPage() {
   const [zip, setZip] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('CH');
+  const [vatEnabled, setVatEnabled] = useState(false);
   const [vatNumber, setVatNumber] = useState('');
   const [bankName, setBankName] = useState('');
   const [iban, setIban] = useState('');
@@ -45,13 +46,21 @@ export default function FirmenprofilPage() {
         const companySnap = await getDoc(doc(db, 'companies', cid));
         if (companySnap.exists()) {
           const c = companySnap.data() as CompanyDoc;
-          setName(c.name || ''); setPhone(c.phone || ''); setContactEmail(c.contactEmail || '');
-          setWebsite(c.website || ''); setStreet(c.address?.street || ''); setZip(c.address?.zip || '');
-          setCity(c.address?.city || ''); setCountry(c.address?.country || 'CH');
-          setVatNumber(c.vatNumber || ''); setBankName(c.bankDetails?.bankName || '');
+          setName(c.name || '');
+          setPhone(c.phone || '');
+          setContactEmail(c.contactEmail || '');
+          setWebsite(c.website || '');
+          setStreet(c.address?.street || '');
+          setZip(c.address?.zip || '');
+          setCity(c.address?.city || '');
+          setCountry(c.address?.country || 'CH');
+          setVatEnabled(c.vatEnabled ?? false);
+          setVatNumber(c.vatNumber || '');
+          setBankName(c.bankDetails?.bankName || '');
           setIban(c.bankDetails?.iban ? formatIban(c.bankDetails.iban) : '');
           setQrIban(c.bankDetails?.qrIban ? formatIban(c.bankDetails.qrIban) : '');
-          setLogoUrl(c.logoUrl || ''); setLogoStoragePath(c.logoStoragePath || '');
+          setLogoUrl(c.logoUrl || '');
+          setLogoStoragePath(c.logoStoragePath || '');
         }
       } catch (err) { console.error(err); }
       finally { setIsLoading(false); }
@@ -67,12 +76,16 @@ export default function FirmenprofilPage() {
     const cleanQrIban = qrIban.trim() ? normalizeIban(qrIban) : '';
     if (cleanIban && !isValidIban(cleanIban)) { setError('IBAN ist ungültig.'); return; }
     if (cleanQrIban && !isValidQrIban(cleanQrIban)) { setError('QR-IBAN ist ungültig.'); return; }
+    if (vatEnabled && !vatNumber.trim()) { setError('MwSt-Nummer ist erforderlich wenn MwSt aktiviert.'); return; }
     setIsSaving(true);
     try {
       await updateDoc(doc(db, 'companies', companyId), {
-        name: name.trim(), phone: phone.trim(), contactEmail: contactEmail.trim(),
+        name: name.trim(),
+        phone: phone.trim(),
+        contactEmail: contactEmail.trim(),
         website: website.trim(),
         address: { street: street.trim(), zip: zip.trim(), city: city.trim(), country },
+        vatEnabled,
         vatNumber: vatNumber.trim(),
         bankDetails: { bankName: bankName.trim(), iban: cleanIban, qrIban: cleanQrIban },
       });
@@ -199,13 +212,50 @@ export default function FirmenprofilPage() {
         {/* MwSt */}
         <section className={sectionClass}>
           <h2 className={sectionTitleClass}>Mehrwertsteuer</h2>
-          <div>
-            <label className={labelClass}>MwSt-Nummer</label>
-            <input type="text" value={vatNumber} onChange={e => setVatNumber(e.target.value)}
-              className={`${inputClass} font-mono`} placeholder="CHE-123.456.789 MWST" />
-            <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
-              ℹ️ Optional. Nur erforderlich wenn Sie MwSt-pflichtig sind (Jahresumsatz &gt; CHF 100&apos;000).
-            </p>
+          <div className="space-y-4">
+
+            {/* Toggle */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">MwSt-pflichtig</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Aktivieren wenn Jahresumsatz &gt; CHF 100'000
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVatEnabled(!vatEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  vatEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  vatEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+            </div>
+
+            {/* MwSt Nummer — nur wenn aktiviert */}
+            {vatEnabled && (
+              <div>
+                <label className={labelClass}>
+                  MwSt-Nummer <span className="text-red-500">*</span>
+                </label>
+                <input type="text" value={vatNumber} onChange={e => setVatNumber(e.target.value)}
+                  className={`${inputClass} font-mono`} placeholder="CHE-123.456.789 MWST" />
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
+                  MwSt 8.1% wird automatisch auf alle Rechnungen angewendet.
+                </p>
+              </div>
+            )}
+
+            {!vatEnabled && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
+                <p className="text-blue-700 dark:text-blue-300 text-sm">
+                  Ohne MwSt — Rechnungen werden ohne Mehrwertsteuer ausgestellt.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -229,7 +279,7 @@ export default function FirmenprofilPage() {
               <input type="text" value={qrIban} onChange={e => setQrIban(e.target.value)}
                 className={`${inputClass} font-mono`} placeholder="CH44 3199 9123 0008 8901 2" />
               <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
-                ℹ️ Spezielle IBAN für Swiss QR-Rechnungen. Kostenlos bei Ihrer Bank beantragen.
+                Spezielle IBAN für Swiss QR-Rechnungen. Kostenlos bei Ihrer Bank beantragen.
               </p>
             </div>
           </div>

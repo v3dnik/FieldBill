@@ -23,19 +23,19 @@ export type Address = {
   street: string;
   zip: string;
   city: string;
-  country: string; // ISO 3166 kratica, npr. "CH"
+  country: string;
 };
 
 export type InvoiceSettings = {
-  numberTemplate: string;   // npr. "RE-{YYYY}-{NUM4}"
-  nextNumber: number;        // naslednja zaporedna številka
-  resetYearly: boolean;      // ali se zaporedna številka resetira ob novem letu
+  numberTemplate: string;
+  nextNumber: number;
+  resetYearly: boolean;
 };
 
 export type BankDetails = {
-  iban: string;              // klasičen IBAN (npr. "CH93...")
-  qrIban: string;            // QR-IBAN za Swiss QR-Rechnung (IIDNR 30000-31999)
-  bankName: string;          // ime banke (npr. "UBS Switzerland AG")
+  iban: string;
+  qrIban: string;
+  bankName: string;
 };
 
 // ───────────────────────────────────────────────────────
@@ -57,15 +57,16 @@ export type UserDoc = {
 
 export type CompanyDoc = {
   companyId: string;
-  ownerId: string;            // uid lastnika (boss)
+  ownerId: string;
   name: string;
   phone: string;
   contactEmail: string;
   website?: string;
+  vatEnabled?: boolean;       // true = MwSt-pflichtig, false/undefined = ohne MwSt
   vatNumber?: string;         // CHE-XXX.XXX.XXX MWST
   address: Address;
-  logoUrl?: string;           // public URL iz Firebase Storage
-  logoStoragePath?: string;   // pot v Storage (za delete)
+  logoUrl?: string;
+  logoStoragePath?: string;
   vatRate: number;            // npr. 0.081 za 8.1%
   currency: string;           // "CHF"
   invoiceSettings: InvoiceSettings;
@@ -95,8 +96,8 @@ export type ItemDoc = {
   itemId: string;
   name: string;
   description?: string;
-  unit: string;             // "Stunde", "km", "Pauschal", "Stück", ...
-  priceRappen: number;      // cena v Rappen (1 CHF = 100 Rappen)
+  unit: string;
+  priceRappen: number;
   active: boolean;
   createdAt: Timestamp;
 };
@@ -106,13 +107,13 @@ export type ItemDoc = {
 // ───────────────────────────────────────────────────────
 
 export type InvoiceLine = {
-  itemId?: string;          // referenca v Leistungskatalog (opcijsko)
+  itemId?: string;
   name: string;
   description?: string;
   unit: string;
   quantity: number;
-  unitPriceRappen: number;  // cena na enoto v Rappen
-  totalRappen: number;      // quantity * unitPriceRappen
+  unitPriceRappen: number;
+  totalRappen: number;
 };
 
 // ───────────────────────────────────────────────────────
@@ -121,39 +122,39 @@ export type InvoiceLine = {
 
 export type InvoiceDoc = {
   invoiceId: string;
-  invoiceNumber: string;     // npr. "RE-2026-0001"
+  invoiceNumber: string;
   status: InvoiceStatus;
-  createdBy: string;         // uid uporabnika, ki je ustvaril
-  dateKey: string;           // "YYYY-MM-DD" v Europe/Zurich
+  createdBy: string;
+  dateKey: string;
   issueDate: Timestamp;
   customerName: string;
   customerAddress?: Address;
   customerEmail?: string;
   lines: InvoiceLine[];
   subtotalRappen: number;
-  vatRate: number;           // shranjeno (zgodovinsko - lahko se spremeni)
+  vatRate: number;
   vatRappen: number;
   totalRappen: number;
   paymentMethod: PaymentMethod;
   paidAt?: Timestamp;
   notes?: string;
-  pdfUrl?: string;           // generiran PDF v Storage
+  pdfUrl?: string;
   createdAt: Timestamp;
 };
 
 // ───────────────────────────────────────────────────────
-//  INVITATION DOCUMENT  →  /companies/{companyId}/invitations/{token}
+//  INVITATION DOCUMENT  →  /invitations/{token}
 // ───────────────────────────────────────────────────────
 
 export type InvitationDoc = {
   token: string;
   companyId: string;
-  invitedBy: string;         // uid boss-a
+  invitedBy: string;
   email?: string;
   role: UserRole;
   expiresAt: Timestamp;
   used: boolean;
-  usedBy?: string;           // uid uporabnika, ki je uporabil token
+  usedBy?: string;
   createdAt: Timestamp;
 };
 
@@ -162,7 +163,7 @@ export type InvitationDoc = {
 // ───────────────────────────────────────────────────────
 
 export type BalanceDoc = {
-  monthKey: string;          // "YYYY-MM"
+  monthKey: string;
   totalRappen: number;
   invoiceCount: number;
   byPaymentMethod: {
@@ -173,9 +174,10 @@ export type BalanceDoc = {
   };
   updatedAt: Timestamp;
 };
-// ─────────────────────────────────────────────
+
+// ───────────────────────────────────────────────────────
 //  EXPENSE DOCUMENT  →  /companies/{companyId}/expenses/{expenseId}
-// ─────────────────────────────────────────────
+// ───────────────────────────────────────────────────────
 
 export type ExpenseCategory =
   | 'Material'
@@ -190,12 +192,12 @@ export type ExpenseCategory =
 
 export type ExpenseDoc = {
   expenseId: string;
-  amountRappen: number;        // Betrag in Rappen (CHF * 100)
-  date: Timestamp;             // Datum des Aufwands
-  category: ExpenseCategory;   // Kategorie
-  description: string;         // Beschreibung
-  receiptUrl?: string;         // Firebase Storage URL (Foto/PDF)
-  receiptStoragePath?: string; // Storage Pfad (für Delete)
+  amountRappen: number;
+  date: Timestamp;
+  category: ExpenseCategory;
+  description: string;
+  receiptUrl?: string;
+  receiptStoragePath?: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
