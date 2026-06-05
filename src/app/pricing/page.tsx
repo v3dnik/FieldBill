@@ -238,29 +238,35 @@ export default function PricingPage() {
                   <th className="text-right py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Mobil</th>
                 </tr>
               </thead>
-              <tbody>
+<tbody>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/10">
                   <td className="py-3 px-4 font-bold text-blue-600 dark:text-blue-400">FieldBill Pro</td>
-                  <td className="py-3 px-4 text-right font-bold text-blue-600 dark:text-blue-400">CHF 19</td>
+                  <td className="py-3 px-4 text-right font-bold text-blue-600 dark:text-blue-400">CHF 39</td>
                   <td className="py-3 px-4 text-right text-green-500">✓</td>
                   <td className="py-3 px-4 text-right text-green-500">✓</td>
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Bexio</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 49+</td>
+                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Bexio Small</td>
+                  <td className="py-3 px-4 text-right text-gray-500">CHF 35</td>
+                  <td className="py-3 px-4 text-right text-green-500">✓</td>
+                  <td className="py-3 px-4 text-right text-gray-400">teilweise</td>
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Bexio Medium</td>
+                  <td className="py-3 px-4 text-right text-gray-500">CHF 59</td>
                   <td className="py-3 px-4 text-right text-green-500">✓</td>
                   <td className="py-3 px-4 text-right text-gray-400">teilweise</td>
                 </tr>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <td className="py-3 px-4 text-gray-700 dark:text-gray-300">AbaNinja</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 25+</td>
+                  <td className="py-3 px-4 text-right text-gray-500">CHF 29+</td>
                   <td className="py-3 px-4 text-right text-green-500">✓</td>
                   <td className="py-3 px-4 text-right text-gray-400">teilweise</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Debitoor</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 35+</td>
-                  <td className="py-3 px-4 text-right text-red-400">✗</td>
+                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Magic Heidi</td>
+                  <td className="py-3 px-4 text-right text-gray-500">CHF 30</td>
+                  <td className="py-3 px-4 text-right text-green-500">✓</td>
                   <td className="py-3 px-4 text-right text-green-500">✓</td>
                 </tr>
               </tbody>
