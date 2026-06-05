@@ -5,19 +5,9 @@
 
 import { Timestamp } from 'firebase/firestore';
 
-// ───────────────────────────────────────────────────────
-//  ENUMS
-// ───────────────────────────────────────────────────────
-
 export type UserRole = 'boss' | 'employee';
-
 export type PaymentMethod = 'bar' | 'twint' | 'karte' | 'rechnung';
-
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled';
-
-// ───────────────────────────────────────────────────────
-//  SHARED TYPES
-// ───────────────────────────────────────────────────────
 
 export type Address = {
   street: string;
@@ -38,10 +28,6 @@ export type BankDetails = {
   bankName: string;
 };
 
-// ───────────────────────────────────────────────────────
-//  USER DOCUMENT  →  /users/{uid}
-// ───────────────────────────────────────────────────────
-
 export type UserDoc = {
   uid: string;
   email: string;
@@ -51,10 +37,6 @@ export type UserDoc = {
   createdAt: Timestamp;
 };
 
-// ───────────────────────────────────────────────────────
-//  COMPANY DOCUMENT  →  /companies/{companyId}
-// ───────────────────────────────────────────────────────
-
 export type CompanyDoc = {
   companyId: string;
   ownerId: string;
@@ -62,21 +44,17 @@ export type CompanyDoc = {
   phone: string;
   contactEmail: string;
   website?: string;
-  vatEnabled?: boolean;       // true = MwSt-pflichtig, false/undefined = ohne MwSt
-  vatNumber?: string;         // CHE-XXX.XXX.XXX MWST
+  vatEnabled?: boolean;
+  vatNumber?: string;
   address: Address;
   logoUrl?: string;
   logoStoragePath?: string;
-  vatRate: number;            // npr. 0.081 za 8.1%
-  currency: string;           // "CHF"
+  vatRate: number;
+  currency: string;
   invoiceSettings: InvoiceSettings;
   bankDetails?: BankDetails;
   createdAt: Timestamp;
 };
-
-// ───────────────────────────────────────────────────────
-//  MEMBERSHIP DOCUMENT  →  /memberships/{uid_companyId}
-// ───────────────────────────────────────────────────────
 
 export type MembershipDoc = {
   membershipId: string;
@@ -88,10 +66,6 @@ export type MembershipDoc = {
   joinedAt: Timestamp;
 };
 
-// ───────────────────────────────────────────────────────
-//  ITEM DOCUMENT  →  /companies/{companyId}/items/{itemId}
-// ───────────────────────────────────────────────────────
-
 export type ItemDoc = {
   itemId: string;
   name: string;
@@ -102,10 +76,6 @@ export type ItemDoc = {
   createdAt: Timestamp;
 };
 
-// ───────────────────────────────────────────────────────
-//  INVOICE LINE  →  vnos znotraj /invoices
-// ───────────────────────────────────────────────────────
-
 export type InvoiceLine = {
   itemId?: string;
   name: string;
@@ -115,10 +85,6 @@ export type InvoiceLine = {
   unitPriceRappen: number;
   totalRappen: number;
 };
-
-// ───────────────────────────────────────────────────────
-//  INVOICE DOCUMENT  →  /companies/{companyId}/invoices/{invoiceId}
-// ───────────────────────────────────────────────────────
 
 export type InvoiceDoc = {
   invoiceId: string;
@@ -142,10 +108,6 @@ export type InvoiceDoc = {
   createdAt: Timestamp;
 };
 
-// ───────────────────────────────────────────────────────
-//  INVITATION DOCUMENT  →  /invitations/{token}
-// ───────────────────────────────────────────────────────
-
 export type InvitationDoc = {
   token: string;
   companyId: string;
@@ -157,10 +119,6 @@ export type InvitationDoc = {
   usedBy?: string;
   createdAt: Timestamp;
 };
-
-// ───────────────────────────────────────────────────────
-//  BALANCE DOCUMENT  →  /companies/{companyId}/balances/{monthKey}
-// ───────────────────────────────────────────────────────
 
 export type BalanceDoc = {
   monthKey: string;
@@ -175,10 +133,7 @@ export type BalanceDoc = {
   updatedAt: Timestamp;
 };
 
-// ───────────────────────────────────────────────────────
-//  EXPENSE DOCUMENT  →  /companies/{companyId}/expenses/{expenseId}
-// ───────────────────────────────────────────────────────
-
+// ── 2 novi kategoriji dodani ──
 export type ExpenseCategory =
   | 'Material'
   | 'Fahrzeug'
@@ -188,6 +143,8 @@ export type ExpenseCategory =
   | 'Personal'
   | 'Miete'
   | 'Telefon'
+  | 'Zinsen & Bankgebühren'
+  | 'Abschreibungen'
   | 'Sonstiges';
 
 export type ExpenseDoc = {
