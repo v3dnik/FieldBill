@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, getDoc, updateDoc, deleteDoc, setDoc, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { MembershipDoc, UserDoc, UserRole } from '@/types/firestore';
@@ -45,13 +45,14 @@ export default function MitarbeiterPage() {
   };
 
   const loadMitarbeiter = async (cId: string) => {
-    const membershipsSnap = await getDocs(collection(db, 'memberships'));
-    const companyMemberships = membershipsSnap.docs
-      .filter(d => d.data().companyId === cId)
-      .map(d => d.data() as MembershipDoc);
+    // Beri samo memberships svoje firme
+    const membershipsSnap = await getDocs(
+      query(collection(db, 'memberships'), where('companyId', '==', cId))
+    );
 
     const list: Mitarbeiter[] = [];
-    for (const m of companyMemberships) {
+    for (const mDoc of membershipsSnap.docs) {
+      const m = mDoc.data() as MembershipDoc;
       const userSnap = await getDoc(doc(db, 'users', m.uid));
       if (userSnap.exists()) {
         const u = userSnap.data() as UserDoc;
@@ -94,14 +95,13 @@ export default function MitarbeiterPage() {
     load();
   }, [user]);
 
-  // Generiraj invite link
   const handleGenerateInvite = async () => {
     setIsGenerating(true);
     setError('');
     try {
       const token = generateToken();
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 dni
+      expiresAt.setDate(expiresAt.getDate() + 7);
 
       await setDoc(doc(db, 'invitations', token), {
         token,
@@ -116,8 +116,7 @@ export default function MitarbeiterPage() {
       });
 
       const baseUrl = window.location.origin;
-      const link = `${baseUrl}/register?invite=${token}`;
-      setGeneratedLink(link);
+      setGeneratedLink(`${baseUrl}/register?invite=${token}`);
     } catch (err) {
       setError('Fehler beim Erstellen des Links.');
     } finally {
@@ -192,7 +191,7 @@ export default function MitarbeiterPage() {
         )}
       </div>
 
-      {/* Success */}
+      {/* Success / Error */}
       {success && (
         <div className="mb-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 px-4 py-3 rounded-xl text-sm">
           ✓ {success}
@@ -214,11 +213,8 @@ export default function MitarbeiterPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Rolle
-              </label>
-              <select value={inviteRole} onChange={e => setInviteRole(e.target.value as UserRole)}
-                className={inputClass}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Rolle</label>
+              <select value={inviteRole} onChange={e => setInviteRole(e.target.value as UserRole)} className={inputClass}>
                 <option value="employee">Mitarbeiter</option>
                 <option value="boss">Geschäftsführer</option>
               </select>
@@ -227,13 +223,11 @@ export default function MitarbeiterPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                 E-Mail <span className="text-gray-400 text-xs">(optional)</span>
               </label>
-              <input type="email" value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
+              <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
                 className={inputClass} placeholder="mitarbeiter@email.ch" />
             </div>
           </div>
 
-          {/* Generierter Link */}
           {generatedLink ? (
             <div className="space-y-3">
               <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3">
@@ -247,18 +241,11 @@ export default function MitarbeiterPage() {
               <div className="flex gap-2">
                 <button onClick={handleCopyLink}
                   className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                    copied
-                      ? 'bg-green-600 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    copied ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}>
                   {copied ? '✓ Kopiert!' : '📋 Link kopieren'}
                 </button>
-                <button onClick={() => {
-                  setShowInviteForm(false);
-                  setGeneratedLink('');
-                  setInviteEmail('');
-                  setInviteRole('employee');
-                }}
+                <button onClick={() => { setShowInviteForm(false); setGeneratedLink(''); setInviteEmail(''); setInviteRole('employee'); }}
                   className="px-4 py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-white text-sm rounded-lg transition-colors">
                   Schliessen
                 </button>
