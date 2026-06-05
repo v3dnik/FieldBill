@@ -82,12 +82,10 @@ export default function BilanzPage() {
   const exportPDF = async (type: 'year' | 'month', month?: number) => {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
-
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const now = new Date().toLocaleDateString('de-CH');
 
-    // Header blau
     pdf.setFillColor(26, 86, 219);
     pdf.rect(0, 0, pageWidth, 30, 'F');
     pdf.setTextColor(255, 255, 255);
@@ -98,96 +96,66 @@ export default function BilanzPage() {
     pdf.setFont('helvetica', 'normal');
     pdf.text('Finanzuebersicht', 14, 22);
 
-    // Firma info rechts
     if (company) {
       pdf.setFontSize(9);
       pdf.text(company.name || '', pageWidth - 14, 10, { align: 'right' });
-      if (company.address?.city) {
-        pdf.text(`${company.address.zip} ${company.address.city}`, pageWidth - 14, 16, { align: 'right' });
-      }
-      if (company.contactEmail) {
-        pdf.text(company.contactEmail, pageWidth - 14, 22, { align: 'right' });
-      }
+      if (company.address?.city) pdf.text(`${company.address.zip} ${company.address.city}`, pageWidth - 14, 16, { align: 'right' });
+      if (company.contactEmail) pdf.text(company.contactEmail, pageWidth - 14, 22, { align: 'right' });
     }
 
-    // Titel
+    const data: MonthData[] = type === 'year' ? monthlyData : monthlyData.filter(m => m.month === month);
+    const title = type === 'year' ? `Jahresbilanz ${selectedYear}` : `Monatsbilanz ${MONATE[month!]} ${selectedYear}`;
+
     pdf.setTextColor(17, 24, 39);
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
-
-    const data: MonthData[] = type === 'year' ? monthlyData : monthlyData.filter(m => m.month === month);
-    const title = type === 'year'
-      ? `Jahresbilanz ${selectedYear}`
-      : `Monatsbilanz ${MONATE[month!]} ${selectedYear}`;
-
     pdf.text(title, 14, 42);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(107, 114, 128);
     pdf.text(`Erstellt am ${now}`, 14, 50);
 
-    // Summary Boxen
     const sumEin = data.reduce((s, m) => s + m.einnahmenRappen, 0);
     const sumAus = data.reduce((s, m) => s + m.ausgabenRappen, 0);
     const sumNetto = sumEin - sumAus;
     const boxY = 58;
     const boxW = (pageWidth - 28 - 8) / 3;
 
-    // Einnahmen
-    pdf.setFillColor(240, 253, 244);
-    pdf.setDrawColor(187, 247, 208);
+    pdf.setFillColor(240, 253, 244); pdf.setDrawColor(187, 247, 208);
     pdf.roundedRect(14, boxY, boxW, 22, 3, 3, 'FD');
-    pdf.setTextColor(107, 114, 128);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(107, 114, 128); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
     pdf.text('Einnahmen', 14 + boxW / 2, boxY + 7, { align: 'center' });
-    pdf.setTextColor(22, 163, 74);
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(22, 163, 74); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold');
     pdf.text(formatCHF(sumEin), 14 + boxW / 2, boxY + 16, { align: 'center' });
 
-    // Ausgaben
     const box2X = 14 + boxW + 4;
-    pdf.setFillColor(254, 242, 242);
-    pdf.setDrawColor(254, 202, 202);
+    pdf.setFillColor(254, 242, 242); pdf.setDrawColor(254, 202, 202);
     pdf.roundedRect(box2X, boxY, boxW, 22, 3, 3, 'FD');
-    pdf.setTextColor(107, 114, 128);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(107, 114, 128); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
     pdf.text('Ausgaben', box2X + boxW / 2, boxY + 7, { align: 'center' });
-    pdf.setTextColor(220, 38, 38);
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(220, 38, 38); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold');
     pdf.text(formatCHF(sumAus), box2X + boxW / 2, boxY + 16, { align: 'center' });
 
-    // Netto
     const box3X = 14 + boxW * 2 + 8;
     const nettoPos = sumNetto >= 0;
     pdf.setFillColor(nettoPos ? 240 : 254, nettoPos ? 253 : 242, nettoPos ? 244 : 242);
     pdf.setDrawColor(nettoPos ? 187 : 254, nettoPos ? 247 : 202, nettoPos ? 208 : 202);
     pdf.roundedRect(box3X, boxY, boxW, 22, 3, 3, 'FD');
-    pdf.setTextColor(107, 114, 128);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(107, 114, 128); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
     pdf.text('Netto', box3X + boxW / 2, boxY + 7, { align: 'center' });
     pdf.setTextColor(nettoPos ? 22 : 220, nettoPos ? 163 : 38, nettoPos ? 74 : 38);
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold');
     pdf.text(formatCHF(sumNetto), box3X + boxW / 2, boxY + 16, { align: 'center' });
 
-    // Tabelle
     const tableData = data.map(m => [
       MONATE[m.month],
       m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '-',
       m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '-',
       (m.einnahmenRappen > 0 || m.ausgabenRappen > 0) ? formatCHF(m.nettoRappen) : '-',
     ]);
-
     tableData.push([
       `Total ${type === 'year' ? selectedYear : MONATE[month!]}`,
-      formatCHF(sumEin),
-      formatCHF(sumAus),
-      formatCHF(sumNetto),
+      formatCHF(sumEin), formatCHF(sumAus), formatCHF(sumNetto),
     ]);
 
     autoTable(pdf, {
@@ -195,12 +163,7 @@ export default function BilanzPage() {
       head: [['Monat', 'Einnahmen', 'Ausgaben', 'Netto']],
       body: tableData,
       theme: 'grid',
-      headStyles: {
-        fillColor: [26, 86, 219],
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 10,
-      },
+      headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
       bodyStyles: { fontSize: 9 },
       columnStyles: {
         0: { fontStyle: 'normal' },
@@ -216,38 +179,19 @@ export default function BilanzPage() {
       },
     });
 
-    // Footer
     const finalY = (pdf as any).lastAutoTable.finalY + 10;
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(156, 163, 175);
-    pdf.text(
-      'Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.',
-      14, finalY
-    );
-    pdf.text(
-      'Entwickelt von Vodnik Digital Solutions — vodnik.ch',
-      pageWidth / 2, finalY + 6, { align: 'center' }
-    );
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(156, 163, 175);
+    pdf.text('Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.', 14, finalY);
+    pdf.text('Entwickelt von Vodnik Digital Solutions — vodnik.ch', pageWidth / 2, finalY + 6, { align: 'center' });
 
     const filename = type === 'year'
       ? `FieldBill_Jahresbilanz_${selectedYear}.pdf`
       : `FieldBill_Monatsbilanz_${MONATE[month!]}_${selectedYear}.pdf`;
-
     pdf.save(filename);
   };
 
-  const handleExportYear = async () => {
-    setExportingYear(true);
-    await exportPDF('year');
-    setExportingYear(false);
-  };
-
-  const handleExportMonth = async (month: number) => {
-    setExportingMonth(month);
-    await exportPDF('month', month);
-    setExportingMonth(null);
-  };
+  const handleExportYear = async () => { setExportingYear(true); await exportPDF('year'); setExportingYear(false); };
+  const handleExportMonth = async (month: number) => { setExportingMonth(month); await exportPDF('month', month); setExportingMonth(null); };
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -276,7 +220,7 @@ export default function BilanzPage() {
         </div>
       </div>
 
-      {/* Jahres-Zusammenfassung */}
+      {/* Zusammenfassung */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">Einnahmen {selectedYear}</p>
@@ -294,56 +238,62 @@ export default function BilanzPage() {
         </div>
       </div>
 
-      {/* Tabelle */}
+      {/* Tabelle — overflow-x-auto nur auf Mobile */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-        <div className="grid grid-cols-5 px-5 py-3 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 uppercase tracking-wide">
-          <div>Monat</div>
-          <div className="text-right">Einnahmen</div>
-          <div className="text-right">Ausgaben</div>
-          <div className="text-right">Netto</div>
-          <div className="text-right">Export</div>
-        </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[500px]">
 
-        {monthlyData.map((m, idx) => {
-          const hasData = m.einnahmenRappen > 0 || m.ausgabenRappen > 0;
-          return (
-            <div key={idx}
-              className={`grid grid-cols-5 px-5 py-3 border-b border-gray-100 dark:border-gray-700/50 ${!hasData && 'opacity-40'}`}>
-              <div className="text-gray-700 dark:text-gray-300 text-sm font-medium">{MONATE[m.month]}</div>
-              <div className="text-right text-green-600 dark:text-green-400 text-sm">
-                {m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—'}
-              </div>
-              <div className="text-right text-red-600 dark:text-red-400 text-sm">
-                {m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—'}
-              </div>
-              <div className={`text-right text-sm font-medium ${m.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {hasData ? formatCHF(m.nettoRappen) : '—'}
-              </div>
-              <div className="text-right">
-                {hasData ? (
-                  <button
-                    onClick={() => handleExportMonth(m.month)}
-                    disabled={exportingMonth === m.month}
-                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors">
-                    {exportingMonth === m.month ? 'Laedt...' : 'PDF'}
-                  </button>
-                ) : (
-                  <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
-                )}
-              </div>
+            {/* Header */}
+            <div className="grid grid-cols-5 px-5 py-3 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 uppercase tracking-wide">
+              <div>Monat</div>
+              <div className="text-right">Einnahmen</div>
+              <div className="text-right">Ausgaben</div>
+              <div className="text-right">Netto</div>
+              <div className="text-right">PDF</div>
             </div>
-          );
-        })}
 
-        {/* Total */}
-        <div className="grid grid-cols-5 px-5 py-4 bg-gray-50 dark:bg-gray-700/50">
-          <div className="text-gray-900 dark:text-white font-bold text-sm">Total {selectedYear}</div>
-          <div className="text-right text-green-600 dark:text-green-400 font-bold text-sm">{formatCHF(totalEinnahmen)}</div>
-          <div className="text-right text-red-600 dark:text-red-400 font-bold text-sm">{formatCHF(totalAusgaben)}</div>
-          <div className={`text-right font-bold text-sm ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {formatCHF(totalNetto)}
+            {/* Rows */}
+            {monthlyData.map((m, idx) => {
+              const hasData = m.einnahmenRappen > 0 || m.ausgabenRappen > 0;
+              return (
+                <div key={idx}
+                  className={`grid grid-cols-5 px-5 py-3 border-b border-gray-100 dark:border-gray-700/50 ${!hasData && 'opacity-40'}`}>
+                  <div className="text-gray-700 dark:text-gray-300 text-sm font-medium">{MONATE[m.month]}</div>
+                  <div className="text-right text-green-600 dark:text-green-400 text-sm">
+                    {m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—'}
+                  </div>
+                  <div className="text-right text-red-600 dark:text-red-400 text-sm">
+                    {m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—'}
+                  </div>
+                  <div className={`text-right text-sm font-medium ${m.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {hasData ? formatCHF(m.nettoRappen) : '—'}
+                  </div>
+                  <div className="text-right">
+                    {hasData ? (
+                      <button onClick={() => handleExportMonth(m.month)} disabled={exportingMonth === m.month}
+                        className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors">
+                        {exportingMonth === m.month ? '...' : 'PDF'}
+                      </button>
+                    ) : (
+                      <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Total */}
+            <div className="grid grid-cols-5 px-5 py-4 bg-gray-50 dark:bg-gray-700/50">
+              <div className="text-gray-900 dark:text-white font-bold text-sm">Total {selectedYear}</div>
+              <div className="text-right text-green-600 dark:text-green-400 font-bold text-sm">{formatCHF(totalEinnahmen)}</div>
+              <div className="text-right text-red-600 dark:text-red-400 font-bold text-sm">{formatCHF(totalAusgaben)}</div>
+              <div className={`text-right font-bold text-sm ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {formatCHF(totalNetto)}
+              </div>
+              <div />
+            </div>
+
           </div>
-          <div />
         </div>
       </div>
 
