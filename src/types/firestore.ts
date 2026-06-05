@@ -8,6 +8,7 @@ import { Timestamp } from 'firebase/firestore';
 export type UserRole = 'boss' | 'employee';
 export type PaymentMethod = 'bar' | 'twint' | 'karte' | 'rechnung';
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled';
+export type KundeTyp = 'firma' | 'privat';
 
 export type Address = {
   street: string;
@@ -133,7 +134,6 @@ export type BalanceDoc = {
   updatedAt: Timestamp;
 };
 
-// ── 2 novi kategoriji dodani ──
 export type ExpenseCategory =
   | 'Material'
   | 'Fahrzeug'
@@ -155,6 +155,37 @@ export type ExpenseDoc = {
   description: string;
   receiptUrl?: string;
   receiptStoragePath?: string;
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+};
+
+// ───────────────────────────────────────────────────────
+//  KUNDE DOCUMENT  →  /companies/{companyId}/kunden/{kundeId}
+// ───────────────────────────────────────────────────────
+
+export type KundeDoc = {
+  kundeId: string;
+  typ: KundeTyp;              // 'firma' | 'privat'
+
+  // Firma felder
+  firmenname?: string;        // nur bei typ='firma'
+  ansprechpartner?: string;   // z.B. "Hans Müller"
+  uid?: string;               // MwSt-Nr der Firma
+
+  // Privat felder
+  vorname?: string;           // nur bei typ='privat'
+  nachname?: string;          // nur bei typ='privat'
+
+  // Gemeinsam
+  email?: string;
+  phone?: string;
+  address?: Address;
+  notizen?: string;
+
+  // Statistik (wird automatisch aktualisiert)
+  rechnungenAnzahl?: number;
+  rechnungenTotalRappen?: number;
+
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 };
