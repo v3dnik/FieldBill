@@ -103,7 +103,6 @@ export default function NeuAusgabePage() {
             {error}
           </div>
         )}
-
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Betrag (CHF) <span className="text-red-500">*</span>
@@ -111,14 +110,12 @@ export default function NeuAusgabePage() {
           <input type="number" value={betrag} onChange={e => setBetrag(e.target.value)}
             placeholder="0.00" min="0" step="0.05" className={inputClass} />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Datum <span className="text-red-500">*</span>
           </label>
           <input type="date" value={datum} onChange={e => setDatum(e.target.value)} className={inputClass} />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Kategorie <span className="text-red-500">*</span>
@@ -137,7 +134,6 @@ export default function NeuAusgabePage() {
             </p>
           )}
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Beschreibung <span className="text-red-500">*</span>
@@ -145,7 +141,6 @@ export default function NeuAusgabePage() {
           <input type="text" value={beschreibung} onChange={e => setBeschreibung(e.target.value)}
             placeholder="z.B. Abschreibung VW Crafter 2024" className={inputClass} />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Beleg <span className="text-gray-400 text-xs">(optional — Foto oder PDF, max. 10MB)</span>
@@ -176,7 +171,6 @@ export default function NeuAusgabePage() {
             </button>
           )}
         </div>
-
         <div className="flex gap-3 pt-2">
           <button onClick={() => router.push('/dashboard/ausgaben')}
             className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium py-2.5 rounded-lg transition-colors">
