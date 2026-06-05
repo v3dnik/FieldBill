@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { InvitationDoc } from '@/types/firestore';
 
-export default function RegisterPage() {
+// ── Glavna forma (potrebuje useSearchParams) ──
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { signUp } = useAuth();
@@ -23,14 +24,12 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Invite state
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<InvitationDoc | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [companyNameDisplay, setCompanyNameDisplay] = useState('');
 
-  // Preberi ?invite= parameter
   useEffect(() => {
     const token = searchParams.get('invite');
     if (!token) return;
@@ -41,35 +40,23 @@ export default function RegisterPage() {
   const loadInvitation = async (token: string) => {
     setInviteLoading(true);
     try {
-      // Poišči invitation po tokenu — shranjen v /invitations/{token}
       const inviteSnap = await getDoc(doc(db, 'invitations', token));
       if (!inviteSnap.exists()) {
         setInviteError('Einladungslink ist ungültig oder abgelaufen.');
         return;
       }
       const inv = inviteSnap.data() as InvitationDoc;
-
-      // Preveri če je že uporabljen
       if (inv.used) {
         setInviteError('Dieser Einladungslink wurde bereits verwendet.');
         return;
       }
-
-      // Preveri expiry
       if (inv.expiresAt.toDate() < new Date()) {
         setInviteError('Dieser Einladungslink ist abgelaufen (7 Tage).');
         return;
       }
-
-      // Naloži ime firme
       const companySnap = await getDoc(doc(db, 'companies', inv.companyId));
-      if (companySnap.exists()) {
-        setCompanyNameDisplay(companySnap.data().name || '');
-      }
-
-      // Predizpolni email če je v invitaciji
+      if (companySnap.exists()) setCompanyNameDisplay(companySnap.data().name || '');
       if (inv.email) setEmail(inv.email);
-
       setInvitation(inv);
     } catch (err) {
       setInviteError('Fehler beim Laden der Einladung.');
@@ -82,87 +69,58 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-
     if (password.length < 6) {
       setError('Das Passwort muss mindestens 6 Zeichen lang sein.');
       setIsLoading(false);
       return;
     }
-
     try {
       const firebaseUser = await signUp(email, password);
-
       if (invitation) {
-        // ── MITARBEITER REGISTRIERUNG (mit Einladung) ──
         await setDoc(doc(db, 'users', firebaseUser.uid), {
-          uid: firebaseUser.uid,
-          email,
-          firstName,
-          lastName,
+          uid: firebaseUser.uid, email, firstName, lastName,
           defaultCompanyId: invitation.companyId,
           createdAt: serverTimestamp(),
         });
-
         const membershipId = `${firebaseUser.uid}_${invitation.companyId}`;
         await setDoc(doc(db, 'memberships', membershipId), {
-          membershipId,
-          uid: firebaseUser.uid,
+          membershipId, uid: firebaseUser.uid,
           companyId: invitation.companyId,
-          role: invitation.role,
-          active: true,
+          role: invitation.role, active: true,
           displayName: `${firstName} ${lastName}`,
           joinedAt: serverTimestamp(),
         });
-
-        // Označimo invitation kot used
         await updateDoc(doc(db, 'invitations', inviteToken!), {
-          used: true,
-          usedBy: firebaseUser.uid,
+          used: true, usedBy: firebaseUser.uid,
         });
-
       } else {
-        // ── BOSS REGISTRIERUNG (neue Firma) ──
         const companyId = firebaseUser.uid;
-
         await setDoc(doc(db, 'users', firebaseUser.uid), {
-          uid: firebaseUser.uid,
-          email,
-          firstName,
-          lastName,
+          uid: firebaseUser.uid, email, firstName, lastName,
           defaultCompanyId: companyId,
           createdAt: serverTimestamp(),
         });
-
         await setDoc(doc(db, 'companies', companyId), {
-          companyId,
-          ownerId: firebaseUser.uid,
-          name: companyName,
-          phone: companyPhone,
+          companyId, ownerId: firebaseUser.uid,
+          name: companyName, phone: companyPhone,
           contactEmail: email,
           address: { street: '', zip: '', city: '', country: 'CH' },
-          logoUrl: '',
-          logoStoragePath: '',
-          vatRate: 0.081,
-          currency: 'CHF',
+          logoUrl: '', logoStoragePath: '',
+          vatRate: 0.081, currency: 'CHF',
           invoiceSettings: {
             numberTemplate: 'RE-{YYYY}-{NUM4}',
-            nextNumber: 1,
-            resetYearly: true,
+            nextNumber: 1, resetYearly: true,
           },
           createdAt: serverTimestamp(),
         });
-
         await setDoc(doc(db, 'memberships', `${firebaseUser.uid}_${companyId}`), {
           membershipId: `${firebaseUser.uid}_${companyId}`,
-          uid: firebaseUser.uid,
-          companyId,
-          role: 'boss',
-          active: true,
+          uid: firebaseUser.uid, companyId,
+          role: 'boss', active: true,
           displayName: `${firstName} ${lastName}`,
           joinedAt: serverTimestamp(),
         });
       }
-
       router.push('/dashboard');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
@@ -198,12 +156,10 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Invite loading */}
         {inviteLoading && (
           <div className="text-center py-8 text-gray-400">Einladung wird geprüft...</div>
         )}
 
-        {/* Invite error */}
         {inviteError && (
           <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-600 dark:text-red-300 px-4 py-4 rounded-xl text-sm text-center mb-6">
             <p className="text-2xl mb-2">⚠️</p>
@@ -214,7 +170,6 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* Invite banner */}
         {invitation && !inviteError && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-xl px-4 py-3 mb-6 text-center">
             <p className="text-green-700 dark:text-green-300 text-sm font-medium">
@@ -224,12 +179,10 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* Form */}
         {!inviteLoading && !inviteError && (
           <form onSubmit={handleSubmit}
             className="space-y-4 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
 
-            {/* Ihre Daten */}
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-2">
               Ihre Daten
             </h2>
@@ -267,7 +220,6 @@ export default function RegisterPage() {
                 disabled={isLoading} />
             </div>
 
-            {/* Ihre Firma — NUR ohne Einladung */}
             {!invitation && (
               <>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-slate-700 pb-2 pt-2">
@@ -319,5 +271,18 @@ export default function RegisterPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+// ── Suspense wrapper — potreben za useSearchParams ──
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900">
+        <p className="text-gray-400">Wird geladen...</p>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
