@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { collection, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
-import { InvoiceDoc } from '@/types/firestore';
+import { InvoiceDoc, MembershipDoc } from '@/types/firestore';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   draft:     { label: 'Entwurf',    color: 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-700' },
@@ -15,8 +15,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 function formatCHF(rappen: number) {
-  const chf = rappen / 100;
-  return 'CHF ' + chf.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return 'CHF ' + (rappen / 100).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDate(ts: any) {
@@ -31,6 +30,7 @@ export default function RechnungenPage() {
   const [invoices, setInvoices] = useState<InvoiceDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [isBoss, setIsBoss] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -39,12 +39,25 @@ export default function RechnungenPage() {
       if (!userSnap.exists()) return;
       const cId = userSnap.data().defaultCompanyId;
 
+      // Preveri vlogo
+      const membershipSnap = await getDoc(doc(db, 'memberships', `${user.uid}_${cId}`));
+      const role = membershipSnap.exists()
+        ? (membershipSnap.data() as MembershipDoc).role
+        : 'employee';
+      setIsBoss(role === 'boss');
+
       const q = query(
         collection(db, 'companies', cId, 'invoices'),
         orderBy('createdAt', 'desc')
       );
+
       const unsub = onSnapshot(q, snap => {
-        setInvoices(snap.docs.map(d => ({ ...d.data(), invoiceId: d.id } as InvoiceDoc)));
+        let all = snap.docs.map(d => ({ ...d.data(), invoiceId: d.id } as InvoiceDoc));
+        // Employee vidi samo svoje
+        if (role !== 'boss') {
+          all = all.filter(i => i.createdBy === user.uid);
+        }
+        setInvoices(all);
         setLoading(false);
       });
       return unsub;
@@ -63,12 +76,13 @@ export default function RechnungenPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Rechnungen</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Ihre Rechnungen und Zahlungen.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {isBoss ? 'Alle Rechnungen der Firma.' : 'Ihre eigenen Rechnungen.'}
+          </p>
         </div>
         <button
           onClick={() => router.push('/dashboard/rechnungen/neu')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
-        >
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
           + Neu
         </button>
       </div>
@@ -87,19 +101,16 @@ export default function RechnungenPage() {
         </div>
       )}
 
-      {/* Filter tabs */}
+      {/* Filter */}
       {!loading && invoices.length > 0 && (
         <div className="flex gap-2 mb-4 flex-wrap">
           {['all', 'draft', 'issued', 'paid', 'cancelled'].map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
+            <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 filter === f
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
+              }`}>
               {f === 'all' ? 'Alle' : STATUS_LABELS[f]?.label}
             </button>
           ))}
@@ -115,10 +126,8 @@ export default function RechnungenPage() {
             {filter === 'all' ? 'Noch keine Rechnungen.' : 'Keine Rechnungen in dieser Kategorie.'}
           </p>
           {filter === 'all' && (
-            <button
-              onClick={() => router.push('/dashboard/rechnungen/neu')}
-              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors"
-            >
+            <button onClick={() => router.push('/dashboard/rechnungen/neu')}
+              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
               Erste Rechnung erstellen
             </button>
           )}
@@ -126,12 +135,8 @@ export default function RechnungenPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map(invoice => (
-            <div
-              key={invoice.invoiceId}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 
-                         rounded-xl p-4 flex items-center justify-between 
-                         hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
-            >
+            <div key={invoice.invoiceId}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-1">
                   <span className="text-gray-900 dark:text-white font-semibold">{invoice.invoiceNumber}</span>
@@ -146,8 +151,7 @@ export default function RechnungenPage() {
                 <p className="text-gray-900 dark:text-white font-bold">{formatCHF(invoice.totalRappen)}</p>
                 <button
                   onClick={() => router.push(`/dashboard/rechnungen/${invoice.invoiceId}`)}
-                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm mt-1"
-                >
+                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm mt-1">
                   Öffnen
                 </button>
               </div>

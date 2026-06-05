@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
-import { ExpenseDoc, ExpenseCategory } from '@/types/firestore';
+import { ExpenseDoc, ExpenseCategory, MembershipDoc } from '@/types/firestore';
 
 const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   Material:     'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/30',
@@ -50,6 +50,7 @@ export default function AusgabenPage() {
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState('');
   const [filter, setFilter] = useState<string>('all');
+  const [isBoss, setIsBoss] = useState(false);
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -70,9 +71,22 @@ export default function AusgabenPage() {
       if (!userSnap.exists()) return;
       const cId = userSnap.data().defaultCompanyId;
       setCompanyId(cId);
+
+      // Preveri vlogo
+      const membershipSnap = await getDoc(doc(db, 'memberships', `${user.uid}_${cId}`));
+      const role = membershipSnap.exists()
+        ? (membershipSnap.data() as MembershipDoc).role
+        : 'employee';
+      setIsBoss(role === 'boss');
+
       const q = query(collection(db, 'companies', cId, 'expenses'), orderBy('date', 'desc'));
       const unsub = onSnapshot(q, snap => {
-        setExpenses(snap.docs.map(d => ({ ...d.data(), expenseId: d.id } as ExpenseDoc)));
+        let all = snap.docs.map(d => ({ ...d.data(), expenseId: d.id } as ExpenseDoc));
+        // Employee vidi samo svoje
+        if (role !== 'boss') {
+          all = all.filter(e => (e as any).createdBy === user.uid);
+        }
+        setExpenses(all);
         setLoading(false);
       });
       return unsub;
@@ -80,7 +94,7 @@ export default function AusgabenPage() {
     init();
   }, [user]);
 
-  // ── EDIT ──
+  // Edit
   const startEdit = (expense: ExpenseDoc) => {
     setEditingId(expense.expenseId);
     setEditBetrag((expense.amountRappen / 100).toFixed(2));
@@ -103,25 +117,19 @@ export default function AusgabenPage() {
         updatedAt: Timestamp.now(),
       });
       setEditingId(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setEditSaving(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setEditSaving(false); }
   };
 
-  // ── DELETE ──
+  // Delete
   const handleDelete = async (expenseId: string) => {
     if (!companyId) return;
     setDeleting(true);
     try {
       await deleteDoc(doc(db, 'companies', companyId, 'expenses', expenseId));
       setDeleteConfirm(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setDeleting(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setDeleting(false); }
   };
 
   const filtered = filter === 'all' ? expenses : expenses.filter(e => e.category === filter);
@@ -137,7 +145,9 @@ export default function AusgabenPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ausgaben</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Ihre Geschäftsausgaben.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {isBoss ? 'Alle Ausgaben der Firma.' : 'Ihre eigenen Ausgaben.'}
+          </p>
         </div>
         <button onClick={() => router.push('/dashboard/ausgaben/neu')}
           className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
@@ -201,7 +211,6 @@ export default function AusgabenPage() {
               className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
 
               {editingId === expense.expenseId ? (
-                /* ── EDIT MODE ── */
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -230,7 +239,7 @@ export default function AusgabenPage() {
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => saveEdit(expense.expenseId)} disabled={editSaving}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
-                      {editSaving ? 'Speichern...' : '✓ Speichern'}
+                      {editSaving ? 'Speichern...' : 'Speichern'}
                     </button>
                     <button onClick={cancelEdit}
                       className="px-4 py-2 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-white text-sm rounded-lg transition-colors">
@@ -239,7 +248,6 @@ export default function AusgabenPage() {
                   </div>
                 </div>
               ) : (
-                /* ── VIEW MODE ── */
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -252,7 +260,7 @@ export default function AusgabenPage() {
                     {expense.receiptUrl && (
                       <a href={expense.receiptUrl} target="_blank" rel="noopener noreferrer"
                         className="text-blue-500 text-xs mt-1 inline-block hover:underline">
-                        📎 Beleg ansehen
+                        Beleg ansehen
                       </a>
                     )}
                   </div>
@@ -265,22 +273,19 @@ export default function AusgabenPage() {
                     </button>
                     <button onClick={() => setDeleteConfirm(expense.expenseId)}
                       className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                      title="Löschen">
+                      title="Loeschen">
                       🗑️
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Delete confirm */}
               {deleteConfirm === expense.expenseId && (
                 <div className="mt-3 pt-3 border-t border-red-100 dark:border-red-900/30 flex items-center gap-3 flex-wrap">
-                  <p className="text-sm text-red-600 dark:text-red-400 flex-1">
-                    Ausgabe wirklich löschen?
-                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400 flex-1">Ausgabe wirklich loeschen?</p>
                   <button onClick={() => handleDelete(expense.expenseId)} disabled={deleting}
                     className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
-                    {deleting ? '...' : 'Ja, löschen'}
+                    {deleting ? '...' : 'Ja, loeschen'}
                   </button>
                   <button onClick={() => setDeleteConfirm(null)}
                     className="px-3 py-1.5 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-white text-sm rounded-lg transition-colors">
