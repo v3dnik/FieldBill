@@ -238,70 +238,79 @@ export default function BilanzPage() {
         </div>
       </div>
 
-      {/* Tabelle — overflow-x-auto nur auf Mobile */}
+      {/* Tabelle */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <div className="min-w-[500px]">
-
-            {/* Header */}
-            <div className="grid grid-cols-5 px-5 py-3 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 uppercase tracking-wide">
-              <div>Monat</div>
-              <div className="text-right">Einnahmen</div>
-              <div className="text-right">Ausgaben</div>
-              <div className="text-right">Netto</div>
-              <div className="text-right">PDF</div>
-            </div>
-
-            {/* Rows */}
-            {monthlyData.map((m, idx) => {
-              const hasData = m.einnahmenRappen > 0 || m.ausgabenRappen > 0;
-              return (
-                <div key={idx}
-                  className={`grid grid-cols-5 px-5 py-3 border-b border-gray-100 dark:border-gray-700/50 ${!hasData && 'opacity-40'}`}>
-                  <div className="text-gray-700 dark:text-gray-300 text-sm font-medium">{MONATE[m.month]}</div>
-                  <div className="text-right text-green-600 dark:text-green-400 text-sm">
-                    {m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—'}
-                  </div>
-                  <div className="text-right text-red-600 dark:text-red-400 text-sm">
-                    {m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—'}
-                  </div>
-                  <div className={`text-right text-sm font-medium ${m.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {hasData ? formatCHF(m.nettoRappen) : '—'}
-                  </div>
-                  <div className="text-right">
-                    {hasData ? (
-                      <button onClick={() => handleExportMonth(m.month)} disabled={exportingMonth === m.month}
-                        className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors">
-                        {exportingMonth === m.month ? '...' : 'PDF'}
-                      </button>
-                    ) : (
-                      <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Total */}
-            <div className="grid grid-cols-5 px-5 py-4 bg-gray-50 dark:bg-gray-700/50">
-              <div className="text-gray-900 dark:text-white font-bold text-sm">Total {selectedYear}</div>
-              <div className="text-right text-green-600 dark:text-green-400 font-bold text-sm">{formatCHF(totalEinnahmen)}</div>
-              <div className="text-right text-red-600 dark:text-red-400 font-bold text-sm">{formatCHF(totalAusgaben)}</div>
-              <div className={`text-right font-bold text-sm ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatCHF(totalNetto)}
-              </div>
-              <div />
-            </div>
-
-          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Monat</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Einnahmen</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Ausgaben</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Netto</th>
+                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">PDF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlyData.map((m, idx) => {
+                const hasData = m.einnahmenRappen > 0 || m.ausgabenRappen > 0;
+                return (
+                  <tr key={idx}
+                    className={`border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${!hasData ? 'opacity-40' : ''}`}>
+                    <td className="px-5 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      {MONATE[m.month]}
+                    </td>
+                    <td className="px-5 py-3 text-sm text-right text-green-600 dark:text-green-400 whitespace-nowrap">
+                      {m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-sm text-right text-red-600 dark:text-red-400 whitespace-nowrap">
+                      {m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—'}
+                    </td>
+                    <td className={`px-5 py-3 text-sm text-right font-medium whitespace-nowrap ${m.nettoRappen >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {hasData ? formatCHF(m.nettoRappen) : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-right whitespace-nowrap">
+                      {hasData ? (
+                        <button onClick={() => handleExportMonth(m.month)} disabled={exportingMonth === m.month}
+                          className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors">
+                          {exportingMonth === m.month ? '...' : 'PDF'}
+                        </button>
+                      ) : (
+                        <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50 dark:bg-gray-700/50 border-t-2 border-gray-200 dark:border-gray-600">
+                <td className="px-5 py-4 text-sm font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                  Total {selectedYear}
+                </td>
+                <td className="px-5 py-4 text-sm font-bold text-right text-green-600 dark:text-green-400 whitespace-nowrap">
+                  {formatCHF(totalEinnahmen)}
+                </td>
+                <td className="px-5 py-4 text-sm font-bold text-right text-red-600 dark:text-red-400 whitespace-nowrap">
+                  {formatCHF(totalAusgaben)}
+                </td>
+                <td className={`px-5 py-4 text-sm font-bold text-right whitespace-nowrap ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {formatCHF(totalNetto)}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
+      {/* Footer */}
       <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mt-6">
         <p className="text-gray-400 text-xs text-center">
           Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.
         </p>
       </div>
+
     </div>
   );
 }
