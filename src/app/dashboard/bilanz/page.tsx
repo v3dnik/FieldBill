@@ -54,20 +54,16 @@ export default function BilanzPage() {
       const userSnap = await getDoc(doc(db, 'users', user.uid));
       if (!userSnap.exists()) return;
       const cId = userSnap.data().defaultCompanyId;
-
       const [invSnap, expSnap, companySnap] = await Promise.all([
         getDocs(collection(db, 'companies', cId, 'invoices')),
         getDocs(collection(db, 'companies', cId, 'expenses')),
         getDoc(doc(db, 'companies', cId)),
       ]);
-
       const invoices = invSnap.docs.map(d => d.data() as InvoiceDoc).filter(i => i.status === 'paid');
       const expenses = expSnap.docs.map(d => d.data() as ExpenseDoc);
-
       if (companySnap.exists()) setCompany(companySnap.data() as CompanyDoc);
       setAllInvoices(invoices);
       setAllExpenses(expenses);
-
       const years = new Set<number>([new Date().getFullYear()]);
       invoices.forEach(i => years.add((i.issueDate?.toDate?.() ?? new Date()).getFullYear()));
       expenses.forEach(e => years.add((e.date?.toDate?.() ?? new Date()).getFullYear()));
@@ -83,7 +79,6 @@ export default function BilanzPage() {
     calcMonthly(allInvoices, allExpenses, year);
   };
 
-  // ── PDF EXPORT ──
   const exportPDF = async (type: 'year' | 'month', month?: number) => {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
@@ -92,7 +87,7 @@ export default function BilanzPage() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const now = new Date().toLocaleDateString('de-CH');
 
-    // ── Header ──
+    // Header blau
     pdf.setFillColor(26, 86, 219);
     pdf.rect(0, 0, pageWidth, 30, 'F');
     pdf.setTextColor(255, 255, 255);
@@ -101,62 +96,57 @@ export default function BilanzPage() {
     pdf.text('FieldBill', 14, 13);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Finanzübersicht', 14, 22);
+    pdf.text('Finanzuebersicht', 14, 22);
 
     // Firma info rechts
     if (company) {
       pdf.setFontSize(9);
-      pdf.text(company.name, pageWidth - 14, 10, { align: 'right' });
-      if (company.address?.city) pdf.text(`${company.address.zip} ${company.address.city}`, pageWidth - 14, 16, { align: 'right' });
-      if (company.contactEmail) pdf.text(company.contactEmail, pageWidth - 14, 22, { align: 'right' });
+      pdf.text(company.name || '', pageWidth - 14, 10, { align: 'right' });
+      if (company.address?.city) {
+        pdf.text(`${company.address.zip} ${company.address.city}`, pageWidth - 14, 16, { align: 'right' });
+      }
+      if (company.contactEmail) {
+        pdf.text(company.contactEmail, pageWidth - 14, 22, { align: 'right' });
+      }
     }
 
-    // ── Titel ──
+    // Titel
     pdf.setTextColor(17, 24, 39);
     pdf.setFontSize(16);
     pdf.setFont('helvetica', 'bold');
 
-    let title = '';
-    let subtitle = '';
-    let data: MonthData[] = [];
-
-    if (type === 'year') {
-      title = `Jahresbilanz ${selectedYear}`;
-      subtitle = `Erstellt am ${now}`;
-      data = monthlyData;
-    } else if (type === 'month' && month !== undefined) {
-      title = `Monatsbilanz ${MONATE[month]} ${selectedYear}`;
-      subtitle = `Erstellt am ${now}`;
-      data = monthlyData.filter(m => m.month === month);
-    }
+    const data: MonthData[] = type === 'year' ? monthlyData : monthlyData.filter(m => m.month === month);
+    const title = type === 'year'
+      ? `Jahresbilanz ${selectedYear}`
+      : `Monatsbilanz ${MONATE[month!]} ${selectedYear}`;
 
     pdf.text(title, 14, 42);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(107, 114, 128);
-    pdf.text(subtitle, 14, 50);
+    pdf.text(`Erstellt am ${now}`, 14, 50);
 
-    // ── Zusammenfassung Boxen ──
+    // Summary Boxen
     const sumEin = data.reduce((s, m) => s + m.einnahmenRappen, 0);
     const sumAus = data.reduce((s, m) => s + m.ausgabenRappen, 0);
     const sumNetto = sumEin - sumAus;
-
     const boxY = 58;
     const boxW = (pageWidth - 28 - 8) / 3;
 
-    // Einnahmen box
+    // Einnahmen
     pdf.setFillColor(240, 253, 244);
     pdf.setDrawColor(187, 247, 208);
     pdf.roundedRect(14, boxY, boxW, 22, 3, 3, 'FD');
     pdf.setTextColor(107, 114, 128);
     pdf.setFontSize(8);
-    pdf.text('Einnahmen', 14 + boxW/2, boxY + 7, { align: 'center' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Einnahmen', 14 + boxW / 2, boxY + 7, { align: 'center' });
     pdf.setTextColor(22, 163, 74);
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(formatCHF(sumEin), 14 + boxW/2, boxY + 16, { align: 'center' });
+    pdf.text(formatCHF(sumEin), 14 + boxW / 2, boxY + 16, { align: 'center' });
 
-    // Ausgaben box
+    // Ausgaben
     const box2X = 14 + boxW + 4;
     pdf.setFillColor(254, 242, 242);
     pdf.setDrawColor(254, 202, 202);
@@ -164,13 +154,13 @@ export default function BilanzPage() {
     pdf.setTextColor(107, 114, 128);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Ausgaben', box2X + boxW/2, boxY + 7, { align: 'center' });
+    pdf.text('Ausgaben', box2X + boxW / 2, boxY + 7, { align: 'center' });
     pdf.setTextColor(220, 38, 38);
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(formatCHF(sumAus), box2X + boxW/2, boxY + 16, { align: 'center' });
+    pdf.text(formatCHF(sumAus), box2X + boxW / 2, boxY + 16, { align: 'center' });
 
-    // Netto box
+    // Netto
     const box3X = 14 + boxW * 2 + 8;
     const nettoPos = sumNetto >= 0;
     pdf.setFillColor(nettoPos ? 240 : 254, nettoPos ? 253 : 242, nettoPos ? 244 : 242);
@@ -179,21 +169,20 @@ export default function BilanzPage() {
     pdf.setTextColor(107, 114, 128);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Netto', box3X + boxW/2, boxY + 7, { align: 'center' });
+    pdf.text('Netto', box3X + boxW / 2, boxY + 7, { align: 'center' });
     pdf.setTextColor(nettoPos ? 22 : 220, nettoPos ? 163 : 38, nettoPos ? 74 : 38);
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(formatCHF(sumNetto), box3X + boxW/2, boxY + 16, { align: 'center' });
+    pdf.text(formatCHF(sumNetto), box3X + boxW / 2, boxY + 16, { align: 'center' });
 
-    // ── Tabelle ──
+    // Tabelle
     const tableData = data.map(m => [
       MONATE[m.month],
-      m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '—',
-      m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '—',
-      (m.einnahmenRappen > 0 || m.ausgabenRappen > 0) ? formatCHF(m.nettoRappen) : '—',
+      m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '-',
+      m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '-',
+      (m.einnahmenRappen > 0 || m.ausgabenRappen > 0) ? formatCHF(m.nettoRappen) : '-',
     ]);
 
-    // Total Zeile
     tableData.push([
       `Total ${type === 'year' ? selectedYear : MONATE[month!]}`,
       formatCHF(sumEin),
@@ -219,7 +208,6 @@ export default function BilanzPage() {
         2: { halign: 'right', textColor: [220, 38, 38] },
         3: { halign: 'right' },
       },
-      // Total vrstica — zadnja vrstica bold
       didParseCell: (hookData) => {
         if (hookData.row.index === tableData.length - 1) {
           hookData.cell.styles.fontStyle = 'bold';
@@ -228,15 +216,20 @@ export default function BilanzPage() {
       },
     });
 
-    // ── Footer ──
+    // Footer
     const finalY = (pdf as any).lastAutoTable.finalY + 10;
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(156, 163, 175);
-    pdf.text('🇨🇭 Einnahmen basieren auf bezahlten Rechnungen. Für die Steuererklärung wenden Sie sich an einen Treuhänder.', 14, finalY);
-    pdf.text(`Entwickelt von Vodnik Digital Solutions — vodnik.ch`, pageWidth / 2, finalY + 6, { align: 'center' });
+    pdf.text(
+      'Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.',
+      14, finalY
+    );
+    pdf.text(
+      'Entwickelt von Vodnik Digital Solutions — vodnik.ch',
+      pageWidth / 2, finalY + 6, { align: 'center' }
+    );
 
-    // ── Download ──
     const filename = type === 'year'
       ? `FieldBill_Jahresbilanz_${selectedYear}.pdf`
       : `FieldBill_Monatsbilanz_${MONATE[month!]}_${selectedYear}.pdf`;
@@ -269,7 +262,7 @@ export default function BilanzPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bilanz</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Finanzübersicht Ihres Unternehmens.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Finanzuebersicht Ihres Unternehmens.</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <select value={selectedYear} onChange={e => handleYearChange(parseInt(e.target.value))}
@@ -277,12 +270,8 @@ export default function BilanzPage() {
             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button onClick={handleExportYear} disabled={exportingYear}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
-            {exportingYear ? (
-              <span>⏳ Wird exportiert...</span>
-            ) : (
-              <span>📄 Jahresbericht PDF</span>
-            )}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+            {exportingYear ? 'Wird exportiert...' : 'Jahresbericht PDF'}
           </button>
         </div>
       </div>
@@ -299,7 +288,9 @@ export default function BilanzPage() {
         </div>
         <div className={`rounded-xl p-5 border ${totalNetto >= 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-500/30' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-500/30'}`}>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">Netto {selectedYear}</p>
-          <p className={`text-xl font-bold ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{formatCHF(totalNetto)}</p>
+          <p className={`text-xl font-bold ${totalNetto >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {formatCHF(totalNetto)}
+          </p>
         </div>
       </div>
 
@@ -333,9 +324,8 @@ export default function BilanzPage() {
                   <button
                     onClick={() => handleExportMonth(m.month)}
                     disabled={exportingMonth === m.month}
-                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                  >
-                    {exportingMonth === m.month ? '⏳' : '📄 PDF'}
+                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors">
+                    {exportingMonth === m.month ? 'Laedt...' : 'PDF'}
                   </button>
                 ) : (
                   <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
@@ -359,7 +349,7 @@ export default function BilanzPage() {
 
       <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700 mt-6">
         <p className="text-gray-400 text-xs text-center">
-          🇨🇭 Einnahmen basieren auf bezahlten Rechnungen. Für die Steuererklärung wenden Sie sich an einen Treuhänder.
+          Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.
         </p>
       </div>
     </div>
