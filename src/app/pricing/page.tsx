@@ -13,8 +13,8 @@ const PLANS = [
     cta: 'Kostenlos starten',
     ctaStyle: 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white',
     features: [
-      { text: '5 Rechnungen pro Monat', included: true },
-      { text: '10 Ausgaben pro Monat', included: true },
+      { text: '3 Rechnungen pro Monat', included: true },
+      { text: '6 Ausgaben pro Monat', included: true },
       { text: '1 Benutzer', included: true },
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
@@ -27,7 +27,7 @@ const PLANS = [
   },
   {
     name: 'Pro',
-    price: { monthly: 19, yearly: 15 },
+    price: { monthly: 39, yearly: 32 },
     description: 'Für selbstständige und kleine Firmen.',
     color: 'border-blue-500',
     badge: 'Beliebteste Wahl',
@@ -48,7 +48,7 @@ const PLANS = [
   },
   {
     name: 'Business',
-    price: { monthly: 39, yearly: 32 },
+    price: { monthly: 79, yearly: 65 },
     description: 'Für wachsende Unternehmen und GmbH.',
     color: 'border-gray-200 dark:border-gray-700',
     badge: null,
