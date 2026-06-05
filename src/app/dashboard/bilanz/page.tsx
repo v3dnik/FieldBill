@@ -36,6 +36,7 @@ export default function BilanzPage() {
   const [exportingYear, setExportingYear] = useState(false);
   const [exportingMonth, setExportingMonth] = useState<number | null>(null);
   const [exportingSteuer, setExportingSteuer] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [prevYearData, setPrevYearData] = useState<MonthData[]>([]);
   const [showSteuerModal, setShowSteuerModal] = useState(false);
@@ -140,6 +141,119 @@ export default function BilanzPage() {
     return () => { if (chartInstance.current) chartInstance.current.destroy(); };
   }, [monthlyData, theme]);
 
+  // ── CSV EXPORT ──
+  const exportCSV = () => {
+    setExportingCSV(true);
+    try {
+      const yearInvoicesPaid = allInvoices.filter(i => (i.issueDate?.toDate?.() ?? new Date()).getFullYear() === selectedYear);
+      const yearInvoicesOpen = allInvoicesUnfiltered.filter(i => {
+        const d = (i.issueDate?.toDate?.() ?? new Date()).getFullYear() === selectedYear;
+        return d && i.status === 'issued';
+      });
+      const yearExpenses = allExpenses.filter(e => (e.date?.toDate?.() ?? new Date()).getFullYear() === selectedYear);
+
+      const totalEin = yearInvoicesPaid.reduce((s, i) => s + i.totalRappen, 0);
+      const totalAus = yearExpenses.reduce((s, e) => s + e.amountRappen, 0);
+      const totalOffen = yearInvoicesOpen.reduce((s, i) => s + i.totalRappen, 0);
+
+      const rows: string[][] = [];
+
+      // Info header
+      rows.push(['FieldBill CSV Export', '', '', '', '', '', '']);
+      rows.push(['Firma', company?.name || '', '', '', '', '', '']);
+      rows.push(['Jahr', selectedYear.toString(), '', '', '', '', '']);
+      rows.push(['Erstellt am', new Date().toLocaleDateString('de-CH'), '', '', '', '', '']);
+      rows.push(['', '', '', '', '', '', '']);
+
+      // Bezahlte Rechnungen
+      rows.push(['=== RECHNUNGEN (bezahlt) ===', '', '', '', '', '', '']);
+      rows.push(['Datum', 'Rechnungs-Nr.', 'Kunde', 'Subtotal CHF', 'MwSt CHF', 'Total CHF', 'Zahlungsmethode']);
+      yearInvoicesPaid.forEach(i => {
+        rows.push([
+          i.issueDate?.toDate?.()?.toLocaleDateString('de-CH') || '—',
+          i.invoiceNumber,
+          i.customerName,
+          ((i.subtotalRappen || 0) / 100).toFixed(2),
+          ((i.vatRappen || 0) / 100).toFixed(2),
+          ((i.totalRappen || 0) / 100).toFixed(2),
+          i.paymentMethod,
+        ]);
+      });
+      rows.push(['TOTAL', '', '', '', '', (totalEin / 100).toFixed(2), '']);
+      rows.push(['', '', '', '', '', '', '']);
+
+      // Offene Forderungen
+      if (yearInvoicesOpen.length > 0) {
+        rows.push(['=== OFFENE FORDERUNGEN (Debitoren) ===', '', '', '', '', '', '']);
+        rows.push(['Datum', 'Rechnungs-Nr.', 'Kunde', '', '', 'Total CHF', '']);
+        yearInvoicesOpen.forEach(i => {
+          rows.push([
+            i.issueDate?.toDate?.()?.toLocaleDateString('de-CH') || '—',
+            i.invoiceNumber,
+            i.customerName,
+            '', '',
+            ((i.totalRappen || 0) / 100).toFixed(2),
+            '',
+          ]);
+        });
+        rows.push(['TOTAL OFFEN', '', '', '', '', (totalOffen / 100).toFixed(2), '']);
+        rows.push(['', '', '', '', '', '', '']);
+      }
+
+      // Ausgaben
+      rows.push(['=== AUSGABEN ===', '', '', '', '', '', '']);
+      rows.push(['Datum', 'Kategorie', 'Beschreibung', '', '', 'Betrag CHF', '']);
+      yearExpenses.forEach(e => {
+        rows.push([
+          e.date?.toDate?.()?.toLocaleDateString('de-CH') || '—',
+          e.category,
+          e.description,
+          '', '',
+          ((e.amountRappen || 0) / 100).toFixed(2),
+          '',
+        ]);
+      });
+      rows.push(['TOTAL', '', '', '', '', (totalAus / 100).toFixed(2), '']);
+      rows.push(['', '', '', '', '', '', '']);
+
+      // Ausgaben nach Kategorien
+      const katMap: Record<string, number> = {};
+      yearExpenses.forEach(e => { katMap[e.category] = (katMap[e.category] || 0) + e.amountRappen; });
+      rows.push(['=== AUSGABEN NACH KATEGORIEN ===', '', '', '', '', '', '']);
+      rows.push(['Kategorie', '', '', '', '', 'Betrag CHF', '']);
+      Object.entries(katMap).sort((a, b) => b[1] - a[1]).forEach(([kat, rappen]) => {
+        rows.push([kat, '', '', '', '', (rappen / 100).toFixed(2), '']);
+      });
+      rows.push(['', '', '', '', '', '', '']);
+
+      // Zusammenfassung
+      rows.push(['=== ZUSAMMENFASSUNG ===', '', '', '', '', '', '']);
+      rows.push(['Einnahmen (bezahlt)', '', '', '', '', (totalEin / 100).toFixed(2), '']);
+      rows.push(['Ausgaben', '', '', '', '', (totalAus / 100).toFixed(2), '']);
+      rows.push(['Reingewinn', '', '', '', '', ((totalEin - totalAus) / 100).toFixed(2), '']);
+      if (yearInvoicesOpen.length > 0) {
+        rows.push(['Offene Forderungen', '', '', '', '', (totalOffen / 100).toFixed(2), '']);
+      }
+
+      // CSV generieren — semikolon + UTF-8 BOM für Excel
+      const csvContent = rows
+        .map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(';'))
+        .join('\n');
+
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FieldBill_CSV_${selectedYear}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setExportingCSV(false);
+    }
+  };
+
   // ── STEUEREXPORT PDF ──
   const exportSteuerPDF = async () => {
     setExportingSteuer(true);
@@ -152,19 +266,12 @@ export default function BilanzPage() {
       const now = new Date().toLocaleDateString('de-CH');
       const isEinzel = steuerTyp === 'einzelunternehmen';
 
-      // Filter data für selectedYear
-      const yearInvoicesPaid = allInvoices.filter(i => {
-        const d = i.issueDate?.toDate?.() ?? new Date();
-        return d.getFullYear() === selectedYear;
-      });
+      const yearInvoicesPaid = allInvoices.filter(i => (i.issueDate?.toDate?.() ?? new Date()).getFullYear() === selectedYear);
       const yearInvoicesOpen = allInvoicesUnfiltered.filter(i => {
-        const d = i.issueDate?.toDate?.() ?? new Date();
-        return d.getFullYear() === selectedYear && i.status === 'issued';
+        const d = (i.issueDate?.toDate?.() ?? new Date()).getFullYear() === selectedYear;
+        return d && i.status === 'issued';
       });
-      const yearExpenses = allExpenses.filter(e => {
-        const d = e.date?.toDate?.() ?? new Date();
-        return d.getFullYear() === selectedYear;
-      });
+      const yearExpenses = allExpenses.filter(e => (e.date?.toDate?.() ?? new Date()).getFullYear() === selectedYear);
 
       const totalEin = yearInvoicesPaid.reduce((s, i) => s + i.totalRappen, 0);
       const totalAus = yearExpenses.reduce((s, e) => s + e.amountRappen, 0);
@@ -174,13 +281,9 @@ export default function BilanzPage() {
       const vatRate = company?.vatRate || 0.081;
       const totalVat = vatEnabled ? yearInvoicesPaid.reduce((s, i) => s + (i.vatRappen || 0), 0) : 0;
 
-      // Ausgaben nach Kategorien
       const katMap: Record<string, number> = {};
-      yearExpenses.forEach(e => {
-        katMap[e.category] = (katMap[e.category] || 0) + e.amountRappen;
-      });
+      yearExpenses.forEach(e => { katMap[e.category] = (katMap[e.category] || 0) + e.amountRappen; });
 
-      // ── HEADER ──
       pdf.setFillColor(26, 86, 219);
       pdf.rect(0, 0, pageWidth, 35, 'F');
       pdf.setTextColor(255, 255, 255);
@@ -199,10 +302,8 @@ export default function BilanzPage() {
 
       let y = 45;
 
-      // ── SEKTION 1: ERFOLGSRECHNUNG ──
       pdf.setTextColor(17, 24, 39); pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
       pdf.text('1. Erfolgsrechnung', 14, y); y += 8;
-
       autoTable(pdf, {
         startY: y,
         head: [['Position', 'Betrag']],
@@ -225,73 +326,39 @@ export default function BilanzPage() {
       });
       y = (pdf as any).lastAutoTable.finalY + 10;
 
-      // ── SEKTION 2: AUSGABEN NACH KATEGORIEN ──
       pdf.setTextColor(17, 24, 39); pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
       pdf.text('2. Ausgaben nach Kategorien', 14, y); y += 8;
-
-      const katRows = Object.entries(katMap)
-        .sort((a, b) => b[1] - a[1])
-        .map(([kat, rappen]) => [kat, formatCHF(rappen)]);
+      const katRows = Object.entries(katMap).sort((a, b) => b[1] - a[1]).map(([kat, rappen]) => [kat, formatCHF(rappen)]);
       katRows.push(['Total Ausgaben', formatCHF(totalAus)]);
-
       autoTable(pdf, {
-        startY: y,
-        head: [['Kategorie', 'Betrag']],
-        body: katRows,
-        theme: 'grid',
+        startY: y, head: [['Kategorie', 'Betrag']], body: katRows, theme: 'grid',
         headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-        bodyStyles: { fontSize: 9 },
-        columnStyles: { 1: { halign: 'right' } },
-        didParseCell: (h) => {
-          if (h.row.index === katRows.length - 1) {
-            h.cell.styles.fontStyle = 'bold';
-            h.cell.styles.fillColor = [243, 244, 246];
-          }
-        },
+        bodyStyles: { fontSize: 9 }, columnStyles: { 1: { halign: 'right' } },
+        didParseCell: (h) => { if (h.row.index === katRows.length - 1) { h.cell.styles.fontStyle = 'bold'; h.cell.styles.fillColor = [243, 244, 246]; } },
       });
       y = (pdf as any).lastAutoTable.finalY + 10;
 
-      // ── SEKTION 3: DEBITORENLISTE ──
       if (yearInvoicesOpen.length > 0) {
         if (y > 220) { pdf.addPage(); y = 20; }
         pdf.setTextColor(17, 24, 39); pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
         pdf.text('3. Offene Forderungen (Debitoren)', 14, y); y += 8;
-
-        const debRows = yearInvoicesOpen.map(i => [
-          i.invoiceNumber,
-          i.customerName,
-          i.issueDate?.toDate?.()?.toLocaleDateString('de-CH') || '—',
-          formatCHF(i.totalRappen),
-        ]);
+        const debRows = yearInvoicesOpen.map(i => [i.invoiceNumber, i.customerName, i.issueDate?.toDate?.()?.toLocaleDateString('de-CH') || '—', formatCHF(i.totalRappen)]);
         debRows.push(['', 'Total offen', '', formatCHF(totalOffen)]);
-
         autoTable(pdf, {
-          startY: y,
-          head: [['Rechnungs-Nr.', 'Kunde', 'Datum', 'Betrag']],
-          body: debRows,
-          theme: 'grid',
+          startY: y, head: [['Rechnungs-Nr.', 'Kunde', 'Datum', 'Betrag']], body: debRows, theme: 'grid',
           headStyles: { fillColor: [234, 179, 8], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-          bodyStyles: { fontSize: 8 },
-          columnStyles: { 3: { halign: 'right', fontStyle: 'bold' } },
-          didParseCell: (h) => {
-            if (h.row.index === debRows.length - 1) {
-              h.cell.styles.fontStyle = 'bold';
-              h.cell.styles.fillColor = [254, 249, 195];
-            }
-          },
+          bodyStyles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right', fontStyle: 'bold' } },
+          didParseCell: (h) => { if (h.row.index === debRows.length - 1) { h.cell.styles.fontStyle = 'bold'; h.cell.styles.fillColor = [254, 249, 195]; } },
         });
         y = (pdf as any).lastAutoTable.finalY + 10;
       }
 
-      // ── SEKTION 4: MWST (wenn aktiv) ──
       if (vatEnabled) {
         if (y > 220) { pdf.addPage(); y = 20; }
         pdf.setTextColor(17, 24, 39); pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
         pdf.text('4. Mehrwertsteuer Abrechnung', 14, y); y += 8;
-
         autoTable(pdf, {
-          startY: y,
-          head: [['Position', 'Betrag']],
+          startY: y, head: [['Position', 'Betrag']],
           body: [
             ['Umsatz (exkl. MwSt)', formatCHF(totalEin - totalVat)],
             [`MwSt ${(vatRate * 100).toFixed(1)}% (geschuldet)`, formatCHF(totalVat)],
@@ -300,21 +367,17 @@ export default function BilanzPage() {
           ],
           theme: 'grid',
           headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-          bodyStyles: { fontSize: 9 },
-          columnStyles: { 1: { halign: 'right' } },
+          bodyStyles: { fontSize: 9 }, columnStyles: { 1: { halign: 'right' } },
         });
         y = (pdf as any).lastAutoTable.finalY + 10;
       }
 
-      // ── SEKTION 5: SPEZIFISCH JE TYP ──
       if (y > 220) { pdf.addPage(); y = 20; }
       pdf.setTextColor(17, 24, 39); pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
       pdf.text(isEinzel ? '5. Hinweise Einzelunternehmen' : '5. Hinweise GmbH', 14, y); y += 8;
-
       if (isEinzel) {
         autoTable(pdf, {
-          startY: y,
-          head: [['Steuerrelevante Information', 'Wert']],
+          startY: y, head: [['Steuerrelevante Information', 'Wert']],
           body: [
             ['AHV-pflichtiges Einkommen (= Reingewinn)', formatCHF(totalGewinn)],
             ['Direkt in Steuererklarung eintragen', 'Formular 5 (Kanton)'],
@@ -323,13 +386,11 @@ export default function BilanzPage() {
           ],
           theme: 'grid',
           headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-          bodyStyles: { fontSize: 9 },
-          columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+          bodyStyles: { fontSize: 9 }, columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
         });
       } else {
         autoTable(pdf, {
-          startY: y,
-          head: [['Steuerrelevante Information', 'Wert / Hinweis']],
+          startY: y, head: [['Steuerrelevante Information', 'Wert / Hinweis']],
           body: [
             ['Reingewinn (vor Steuern)', formatCHF(totalGewinn)],
             ['Gewinnsteuer Bund ca. 8.5%', formatCHF(Math.round(totalGewinn * 0.085))],
@@ -340,47 +401,24 @@ export default function BilanzPage() {
           ],
           theme: 'grid',
           headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
-          bodyStyles: { fontSize: 9 },
-          columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+          bodyStyles: { fontSize: 9 }, columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
         });
       }
       y = (pdf as any).lastAutoTable.finalY + 10;
 
-      // ── MONATLICHE UEBERSICHT ──
       if (y > 200) { pdf.addPage(); y = 20; }
       pdf.setTextColor(17, 24, 39); pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
-      const nextSek = isEinzel ? '6' : '6';
-      pdf.text(`${nextSek}. Monatliche Uebersicht ${selectedYear}`, 14, y); y += 8;
-
-      const monthRows = monthlyData.map(m => [
-        MONATE[m.month],
-        m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '-',
-        m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '-',
-        (m.einnahmenRappen > 0 || m.ausgabenRappen > 0) ? formatCHF(m.nettoRappen) : '-',
-      ]);
+      pdf.text(`6. Monatliche Uebersicht ${selectedYear}`, 14, y); y += 8;
+      const monthRows = monthlyData.map(m => [MONATE[m.month], m.einnahmenRappen > 0 ? formatCHF(m.einnahmenRappen) : '-', m.ausgabenRappen > 0 ? formatCHF(m.ausgabenRappen) : '-', (m.einnahmenRappen > 0 || m.ausgabenRappen > 0) ? formatCHF(m.nettoRappen) : '-']);
       monthRows.push([`Total ${selectedYear}`, formatCHF(totalEin), formatCHF(totalAus), formatCHF(totalGewinn)]);
-
       autoTable(pdf, {
-        startY: y,
-        head: [['Monat', 'Einnahmen', 'Ausgaben', 'Netto']],
-        body: monthRows,
-        theme: 'grid',
+        startY: y, head: [['Monat', 'Einnahmen', 'Ausgaben', 'Netto']], body: monthRows, theme: 'grid',
         headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10 },
         bodyStyles: { fontSize: 9 },
-        columnStyles: {
-          1: { halign: 'right', textColor: [22, 163, 74] },
-          2: { halign: 'right', textColor: [220, 38, 38] },
-          3: { halign: 'right' },
-        },
-        didParseCell: (h) => {
-          if (h.row.index === monthRows.length - 1) {
-            h.cell.styles.fontStyle = 'bold';
-            h.cell.styles.fillColor = [243, 244, 246];
-          }
-        },
+        columnStyles: { 1: { halign: 'right', textColor: [22, 163, 74] }, 2: { halign: 'right', textColor: [220, 38, 38] }, 3: { halign: 'right' } },
+        didParseCell: (h) => { if (h.row.index === monthRows.length - 1) { h.cell.styles.fontStyle = 'bold'; h.cell.styles.fillColor = [243, 244, 246]; } },
       });
 
-      // ── FOOTER ──
       const pages = pdf.getNumberOfPages();
       for (let i = 1; i <= pages; i++) {
         pdf.setPage(i);
@@ -389,7 +427,6 @@ export default function BilanzPage() {
         pdf.text('FieldBill — Entwickelt von Vodnik Digital Solutions — vodnik.ch', pageWidth / 2, 295, { align: 'center' });
         pdf.text('Diese Unterlagen dienen als Grundlage fuer den Treuhander. Keine Steuerberatung.', pageWidth / 2, 285, { align: 'center' });
       }
-
       pdf.save(`FieldBill_Steuerexport_${steuerTyp === 'einzelunternehmen' ? 'Einzelunternehmen' : 'GmbH'}_${selectedYear}.pdf`);
     } catch (err) {
       console.error(err);
@@ -539,7 +576,11 @@ export default function BilanzPage() {
           </button>
           <button onClick={() => setShowSteuerModal(true)} disabled={exportingSteuer}
             className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
-            {exportingSteuer ? 'Erstellt...' : 'Steuerexport'}
+            {exportingSteuer ? '...' : 'Steuerexport'}
+          </button>
+          <button onClick={exportCSV} disabled={exportingCSV}
+            className="px-3 py-2 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+            {exportingCSV ? '...' : 'CSV'}
           </button>
         </div>
       </div>
@@ -645,7 +686,7 @@ export default function BilanzPage() {
       {/* Footer */}
       <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
         <p className="text-gray-400 text-xs text-center">
-          Einnahmen basieren auf bezahlten Rechnungen. Fuer die Steuererklaerung wenden Sie sich an einen Treuhander.
+          Einnahmen basieren auf bezahlten Rechnungen. Fuer GmbH empfehlen wir einen Treuhander. Entwickelt von Vodnik Digital Solutions.
         </p>
       </div>
 
