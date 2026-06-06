@@ -83,6 +83,18 @@ function NeuRechnungInner() {
   const [notes, setNotes] = useState('');
   const [issueDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Bereits bezahlt
+  const [bereitsBezahlt, setBereitsBezahlt] = useState(false);
+
+  // Pametna logika — Bar/TWINT/Karte → avtomatsko bezahlt
+  useEffect(() => {
+    if (zahlungsmethode === 'bar' || zahlungsmethode === 'twint' || zahlungsmethode === 'karte') {
+      setBereitsBezahlt(true);
+    } else {
+      setBereitsBezahlt(false);
+    }
+  }, [zahlungsmethode]);
+
   useEffect(() => {
     if (!user) return;
     const init = async () => {
@@ -99,8 +111,6 @@ function NeuRechnungInner() {
       setKatalog(itemsSnap.docs.map(d => ({ ...d.data(), itemId: d.id } as ItemDoc)).filter(i => i.active));
       const kundenList = kundenSnap.docs.map(d => ({ ...d.data(), kundeId: d.id } as KundeDoc));
       setKunden(kundenList);
-
-      // Če pride iz Kunden strani z ?kundeId=
       if (kundeIdParam) {
         const k = kundenList.find(k => k.kundeId === kundeIdParam);
         if (k) fillFromKunde(k);
@@ -162,7 +172,252 @@ function NeuRechnungInner() {
     setPositionen(updated);
   };
 
-  const handleSave = async (status: 'draft' | 'issued') => {
+  // PDF als Base64 generieren
+  const generatePDFBase64 = async (
+    invoiceNumber: string,
+    isQuittung: boolean
+  ): Promise<string> => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const now = new Date().toLocaleDateString('de-CH');
+
+    // Header
+    pdf.setFillColor(26, 86, 219);
+    pdf.rect(0, 0, pageWidth, 38, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(22); pdf.setFont('helvetica', 'bold');
+    pdf.text(company?.name || '', 14, 14);
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+    if (company?.address?.street) pdf.text(company.address.street, 14, 21);
+    if (company?.address?.city) pdf.text(`${company.address.zip} ${company.address.city}`, 14, 26);
+    if (company?.phone) pdf.text(company.phone, 14, 31);
+    if (company?.contactEmail) pdf.text(company.contactEmail, 14, 36);
+
+    // Rechnung / Quittung info rechts
+    pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
+    pdf.text(isQuittung ? 'QUITTUNG' : 'RECHNUNG', pageWidth - 14, 14, { align: 'right' });
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
+    pdf.text(invoiceNumber, pageWidth - 14, 21, { align: 'right' });
+    pdf.text(`Datum: ${now}`, pageWidth - 14, 27, { align: 'right' });
+    if (isQuittung) {
+      pdf.text(`Zahlungsart: ${ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label || zahlungsmethode}`, pageWidth - 14, 33, { align: 'right' });
+    }
+
+    // Status Badge
+    if (isQuittung) {
+      pdf.setFillColor(22, 163, 74);
+      pdf.roundedRect(14, 42, 30, 8, 2, 2, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold');
+      pdf.text('BEZAHLT', 29, 47.5, { align: 'center' });
+    }
+
+    // Empfänger
+    pdf.setTextColor(107, 114, 128); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
+    pdf.text('RECHNUNGSEMPFÄNGER', 14, 58);
+    pdf.setTextColor(17, 24, 39); pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
+    pdf.text(customerName, 14, 65);
+    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+    if (customerStreet) { pdf.setTextColor(55, 65, 81); pdf.text(customerStreet, 14, 71); }
+    if (customerZip) pdf.text(`${customerZip} ${customerCity}`, 14, 76);
+    if (customerEmail) { pdf.setTextColor(107, 114, 128); pdf.text(customerEmail, 14, 82); }
+
+    // Positionen
+    const tableBody = positionen.map(p => [
+      p.name + (p.description ? `\n${p.description}` : ''),
+      p.quantity.toString(),
+      p.unit,
+      formatCHF(p.unitPriceRappen),
+      formatCHF(p.quantity * p.unitPriceRappen),
+    ]);
+
+    autoTable(pdf, {
+      startY: 90,
+      head: [['Bezeichnung', 'Menge', 'Einheit', 'Preis', 'Total']],
+      body: tableBody,
+      theme: 'grid',
+      headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: [55, 65, 81] },
+      columnStyles: {
+        0: { cellWidth: 'auto' },
+        1: { halign: 'right', cellWidth: 20 },
+        2: { halign: 'center', cellWidth: 20 },
+        3: { halign: 'right', cellWidth: 28 },
+        4: { halign: 'right', cellWidth: 28, fontStyle: 'bold' },
+      },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+    });
+
+    let y = (pdf as any).lastAutoTable.finalY + 6;
+
+    // Totals
+    const totalsX = pageWidth - 80;
+    pdf.setFontSize(9); pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
+    pdf.text('Subtotal:', totalsX, y);
+    pdf.setTextColor(55, 65, 81);
+    pdf.text(formatCHF(subtotalRappen), pageWidth - 14, y, { align: 'right' });
+    y += 6;
+
+    if (vatEnabled && vatRappen > 0) {
+      pdf.setTextColor(107, 114, 128);
+      pdf.text(`MwSt ${(vatRate * 100).toFixed(1)}%:`, totalsX, y);
+      pdf.setTextColor(55, 65, 81);
+      pdf.text(formatCHF(vatRappen), pageWidth - 14, y, { align: 'right' });
+      y += 6;
+    } else if (!vatEnabled) {
+      pdf.setTextColor(107, 114, 128);
+      pdf.text('MwSt: nicht pflichtig', totalsX, y);
+      y += 6;
+    }
+
+    pdf.setDrawColor(26, 86, 219); pdf.setLineWidth(0.5);
+    pdf.line(totalsX, y, pageWidth - 14, y); y += 5;
+
+    pdf.setFillColor(26, 86, 219);
+    pdf.roundedRect(totalsX - 4, y - 4, 80, 12, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(11); pdf.setFont('helvetica', 'bold');
+    pdf.text(isQuittung ? 'BEZAHLT CHF:' : 'TOTAL CHF:', totalsX, y + 4);
+    pdf.text(formatCHF(totalRappen), pageWidth - 14, y + 4, { align: 'right' });
+    y += 18;
+
+    // Zahlungsinfos (nur bei Rechnung)
+    if (!isQuittung && company?.bankDetails?.iban) {
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39);
+      pdf.text('Zahlungsinformationen', 14, y); y += 5;
+      pdf.setTextColor(107, 114, 128);
+      pdf.text(`IBAN: ${company.bankDetails.iban}`, 14, y); y += 5;
+      if (company.bankDetails.bankName) pdf.text(`Bank: ${company.bankDetails.bankName}`, 14, y);
+    }
+
+    // Quittung Hinweis
+    if (isQuittung) {
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(22, 163, 74);
+      pdf.text(`Zahlung erhalten am ${now} via ${ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label || zahlungsmethode}`, 14, y);
+    }
+
+    // Footer
+    const pages = pdf.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(7); pdf.setTextColor(156, 163, 175); pdf.setFont('helvetica', 'normal');
+      pdf.text(`Seite ${i} von ${pages}`, pageWidth / 2, 290, { align: 'center' });
+      pdf.text('Gemaess OR Art. 958f werden alle Dokumente 10 Jahre archiviert.', pageWidth / 2, 285, { align: 'center' });
+      pdf.text('Entwickelt von Vodnik Digital Solutions — vodnik.ch', pageWidth / 2, 294, { align: 'center' });
+    }
+
+    return pdf.output('datauristring').split(',')[1];
+  };
+
+  // Email senden
+  const sendEmail = async (
+    toEmail: string,
+    invoiceNumber: string,
+    isQuittung: boolean,
+    pdfBase64: string
+  ) => {
+    const zahlungsart = ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label || zahlungsmethode;
+    const now = new Date().toLocaleDateString('de-CH');
+
+    const subject = isQuittung
+      ? `Zahlungsbestätigung ${invoiceNumber} ✓ — ${company?.name}`
+      : `Rechnung ${invoiceNumber} — ${company?.name}`;
+
+    const html = isQuittung ? `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #1a56db; padding: 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">FieldBill</h1>
+          <p style="color: #93c5fd; margin: 4px 0 0 0; font-size: 14px;">${company?.name}</p>
+        </div>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px;">
+          <p style="color: #16a34a; font-size: 18px; font-weight: bold; margin: 0;">✓ Zahlung bestätigt</p>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e5e7eb; padding: 24px;">
+          <p style="color: #374151;">Sehr geehrte Damen und Herren</p>
+          <p style="color: #374151;">Wir bestätigen den Eingang Ihrer Zahlung:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Dokument-Nr.</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; text-align: right;">${invoiceNumber}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Betrag</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #16a34a; text-align: right; font-size: 18px;">${formatCHF(totalRappen)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Zahlungsart</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; text-align: right;">${zahlungsart}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Datum</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; text-align: right;">${now}</td>
+            </tr>
+          </table>
+          <p style="color: #374151;">Die Quittung finden Sie im Anhang.</p>
+          <p style="color: #374151; margin-top: 24px;">Mit freundlichen Grüssen<br><strong>${company?.name}</strong></p>
+        </div>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; padding: 16px; border-radius: 0 0 12px 12px; text-align: center;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">FieldBill — Entwickelt von Vodnik Digital Solutions — vodnik.ch</p>
+        </div>
+      </div>
+    ` : `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #1a56db; padding: 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">FieldBill</h1>
+          <p style="color: #93c5fd; margin: 4px 0 0 0; font-size: 14px;">${company?.name}</p>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e5e7eb; padding: 24px;">
+          <p style="color: #374151;">Sehr geehrte Damen und Herren</p>
+          <p style="color: #374151;">Im Anhang finden Sie unsere Rechnung:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Rechnungs-Nr.</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; text-align: right;">${invoiceNumber}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Betrag</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #1a56db; text-align: right; font-size: 18px;">${formatCHF(totalRappen)}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Zahlungsfrist</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; text-align: right;">${zahlungsfrist} Tage</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Zahlungsart</td>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; text-align: right;">${zahlungsart}</td>
+            </tr>
+          </table>
+          ${company?.bankDetails?.iban ? `
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <p style="color: #1e40af; font-weight: bold; margin: 0 0 8px 0; font-size: 14px;">Zahlungsinformationen</p>
+            <p style="color: #374151; font-size: 14px; margin: 4px 0;">IBAN: <strong>${company.bankDetails.iban}</strong></p>
+            ${company.bankDetails.bankName ? `<p style="color: #374151; font-size: 14px; margin: 4px 0;">Bank: ${company.bankDetails.bankName}</p>` : ''}
+          </div>
+          ` : ''}
+          <p style="color: #374151; margin-top: 24px;">Mit freundlichen Grüssen<br><strong>${company?.name}</strong></p>
+        </div>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; padding: 16px; border-radius: 0 0 12px 12px; text-align: center;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">FieldBill — Entwickelt von Vodnik Digital Solutions — vodnik.ch</p>
+        </div>
+      </div>
+    `;
+
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: toEmail,
+        subject,
+        html,
+        pdfBase64,
+        pdfFilename: isQuittung ? `Quittung_${invoiceNumber}.pdf` : `Rechnung_${invoiceNumber}.pdf`,
+      }),
+    });
+  };
+
+  const handleSave = async () => {
     if (!customerName.trim()) { setError('Kundenname ist erforderlich.'); return; }
     if (positionen.some(p => !p.name.trim())) { setError('Alle Positionen müssen einen Namen haben.'); return; }
     if (positionen.some(p => p.quantity <= 0)) { setError('Alle Mengen müssen grösser als 0 sein.'); return; }
@@ -178,8 +433,12 @@ function NeuRechnungInner() {
       const dueDateObj = new Date(issueDateObj);
       dueDateObj.setDate(dueDateObj.getDate() + zahlungsfrist);
 
+      // Status: bezahlt ali ausgestellt
+      const status = bereitsBezahlt ? 'paid' : 'issued';
+
       await addDoc(collection(db, 'companies', companyId, 'invoices'), {
-        invoiceNumber, status,
+        invoiceNumber,
+        status,
         createdBy: user!.uid,
         dateKey: issueDate,
         issueDate: Timestamp.fromDate(issueDateObj),
@@ -198,10 +457,18 @@ function NeuRechnungInner() {
         paymentMethod: zahlungsmethode,
         zahlungsfrist,
         notes: notes.trim(),
+        ...(bereitsBezahlt && { paidAt: Timestamp.now() }),
         createdAt: Timestamp.now(),
       });
 
       await updateDoc(compRef, { 'invoiceSettings.nextNumber': nextNum + 1 });
+
+      // Email senden če ima stranka email
+      if (customerEmail.trim()) {
+        const pdfBase64 = await generatePDFBase64(invoiceNumber, bereitsBezahlt);
+        await sendEmail(customerEmail.trim(), invoiceNumber, bereitsBezahlt, pdfBase64);
+      }
+
       router.push('/dashboard/rechnungen');
     } catch (err: any) {
       setError('Fehler: ' + (err?.message || 'Unbekannt'));
@@ -215,8 +482,12 @@ function NeuRechnungInner() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Neue Rechnung</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Rechnung erstellen und speichern.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {bereitsBezahlt ? 'Neue Quittung' : 'Neue Rechnung'}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {bereitsBezahlt ? 'Sofortzahlung erfassen und quittieren.' : 'Rechnung erstellen und ausstellen.'}
+          </p>
         </div>
         <button onClick={() => router.push('/dashboard/rechnungen')}
           className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors">
@@ -234,8 +505,6 @@ function NeuRechnungInner() {
       <div className={sectionClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Kunde</h2>
         <div className="space-y-4">
-
-          {/* Kunden Suche */}
           {kunden.length > 0 && (
             <div className="relative">
               <label className={labelClass}>Aus Kundenliste wählen</label>
@@ -243,30 +512,21 @@ function NeuRechnungInner() {
                 <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <span>{selectedKunde.typ === 'firma' ? '🏢' : '👤'}</span>
-                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                      {getKundeName(selectedKunde)}
-                    </span>
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{getKundeName(selectedKunde)}</span>
                   </div>
-                  <button onClick={clearKunde}
-                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400">
-                    ✕ Ändern
-                  </button>
+                  <button onClick={clearKunde} className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400">✕ Ändern</button>
                 </div>
               ) : (
                 <div className="relative">
-                  <input
-                    type="text"
-                    value={kundeSearch}
+                  <input type="text" value={kundeSearch}
                     onChange={e => { setKundeSearch(e.target.value); setShowKundeDropdown(true); }}
                     onFocus={() => setShowKundeDropdown(true)}
                     placeholder="Suchen oder neu eingeben..."
-                    className={inputClass}
-                  />
+                    className={inputClass} />
                   {showKundeDropdown && kundeSearch && filteredKunden.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-lg overflow-hidden">
                       {filteredKunden.slice(0, 5).map(k => (
-                        <button key={k.kundeId}
-                          onClick={() => fillFromKunde(k)}
+                        <button key={k.kundeId} onClick={() => fillFromKunde(k)}
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 text-left transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-b-0">
                           <span>{k.typ === 'firma' ? '🏢' : '👤'}</span>
                           <div>
@@ -279,13 +539,9 @@ function NeuRechnungInner() {
                   )}
                 </div>
               )}
-              <p className="text-xs text-gray-400 mt-1">
-                Oder unten manuell eingeben für neue Kunden
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Oder unten manuell eingeben</p>
             </div>
           )}
-
-          {/* Manuelle Felder */}
           <div>
             <label className={labelClass}>Name / Firma <span className="text-red-500">*</span></label>
             <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
@@ -309,7 +565,12 @@ function NeuRechnungInner() {
             </div>
           </div>
           <div>
-            <label className={labelClass}>E-Mail <span className="text-gray-400 text-xs">(optional)</span></label>
+            <label className={labelClass}>
+              E-Mail
+              <span className="text-gray-400 text-xs ml-1">
+                {customerEmail ? '— wird automatisch per E-Mail zugestellt' : '(optional)'}
+              </span>
+            </label>
             <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
               placeholder="kunde@beispiel.ch" className={inputClass} />
           </div>
@@ -325,9 +586,7 @@ function NeuRechnungInner() {
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">Position {idx + 1}</span>
                 {positionen.length > 1 && (
-                  <button onClick={() => removePosition(idx)} className="text-red-500 dark:text-red-400 hover:text-red-700 text-sm">
-                    Entfernen
-                  </button>
+                  <button onClick={() => removePosition(idx)} className="text-red-500 dark:text-red-400 hover:text-red-700 text-sm">Entfernen</button>
                 )}
               </div>
               {katalog.length > 0 && (
@@ -336,9 +595,7 @@ function NeuRechnungInner() {
                   <select onChange={e => selectFromKatalog(idx, e.target.value)} defaultValue="" className={inputSmClass}>
                     <option value="">— Leistung auswählen —</option>
                     {katalog.map(item => (
-                      <option key={item.itemId} value={item.itemId}>
-                        {item.name} — {formatCHF(item.priceRappen)} / {item.unit}
-                      </option>
+                      <option key={item.itemId} value={item.itemId}>{item.name} — {formatCHF(item.priceRappen)} / {item.unit}</option>
                     ))}
                   </select>
                 </div>
@@ -362,8 +619,7 @@ function NeuRechnungInner() {
                 </div>
                 <div>
                   <label className={labelSmClass}>Einheit</label>
-                  <input type="text" value={pos.unit}
-                    onChange={e => updatePosition(idx, 'unit', e.target.value)}
+                  <input type="text" value={pos.unit} onChange={e => updatePosition(idx, 'unit', e.target.value)}
                     placeholder="Stunde" className={inputSmClass} />
                 </div>
                 <div>
@@ -390,23 +646,19 @@ function NeuRechnungInner() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Zusammenfassung</h2>
         <div className="space-y-2">
           <div className="flex justify-between text-gray-600 dark:text-gray-300">
-            <span>Subtotal</span>
-            <span>{formatCHF(subtotalRappen)}</span>
+            <span>Subtotal</span><span>{formatCHF(subtotalRappen)}</span>
           </div>
           {vatEnabled ? (
             <div className="flex justify-between text-gray-600 dark:text-gray-300">
-              <span>MwSt {(vatRate * 100).toFixed(1)}%</span>
-              <span>{formatCHF(vatRappen)}</span>
+              <span>MwSt {(vatRate * 100).toFixed(1)}%</span><span>{formatCHF(vatRappen)}</span>
             </div>
           ) : (
             <div className="flex justify-between text-gray-400 dark:text-gray-500 text-sm">
-              <span>MwSt</span>
-              <span>nicht MwSt-pflichtig</span>
+              <span>MwSt</span><span>nicht MwSt-pflichtig</span>
             </div>
           )}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex justify-between text-gray-900 dark:text-white font-bold text-lg">
-            <span>Total CHF</span>
-            <span>{formatCHF(totalRappen)}</span>
+            <span>Total CHF</span><span>{formatCHF(totalRappen)}</span>
           </div>
         </div>
       </div>
@@ -422,13 +674,44 @@ function NeuRechnungInner() {
                 {ZAHLUNGSMETHODEN.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
               </select>
             </div>
-            <div>
-              <label className={labelClass}>Zahlungsfrist</label>
-              <select value={zahlungsfrist} onChange={e => setZahlungsfrist(parseInt(e.target.value))} className={inputClass}>
-                {ZAHLUNGSFRISTEN.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
-              </select>
-            </div>
+            {!bereitsBezahlt && (
+              <div>
+                <label className={labelClass}>Zahlungsfrist</label>
+                <select value={zahlungsfrist} onChange={e => setZahlungsfrist(parseInt(e.target.value))} className={inputClass}>
+                  {ZAHLUNGSFRISTEN.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
+                </select>
+              </div>
+            )}
           </div>
+
+          {/* Bereits bezahlt Toggle */}
+          <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-colors ${
+            bereitsBezahlt
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600'
+              : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
+          }`}>
+            <div>
+              <p className={`font-medium text-sm ${bereitsBezahlt ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                {bereitsBezahlt ? '✓ Bereits bezahlt — Quittung wird ausgestellt' : 'Noch nicht bezahlt — Rechnung wird ausgestellt'}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {bereitsBezahlt
+                  ? `${ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label} — sofort als bezahlt markiert`
+                  : 'Zahlungsfrist gilt ab Ausstellungsdatum'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBereitsBezahlt(!bereitsBezahlt)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                bereitsBezahlt ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                bereitsBezahlt ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+
           <div>
             <label className={labelClass}>Bemerkungen <span className="text-gray-400 text-xs">(optional)</span></label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
@@ -438,15 +721,29 @@ function NeuRechnungInner() {
         </div>
       </div>
 
-      {/* Buttons */}
-      <div className="flex gap-3 pb-8">
-        <button onClick={() => handleSave('draft')} disabled={saving}
-          className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-white font-medium py-3 rounded-lg transition-colors">
-          {saving ? 'Wird gespeichert...' : 'Als Entwurf speichern'}
-        </button>
-        <button onClick={() => handleSave('issued')} disabled={saving}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors">
-          {saving ? 'Wird gespeichert...' : 'Rechnung ausstellen'}
+      {/* Email Info */}
+      {customerEmail && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
+          <p className="text-blue-700 dark:text-blue-300 text-sm font-medium">
+            📧 {bereitsBezahlt ? 'Quittung' : 'Rechnung'} wird automatisch an {customerEmail} gesendet
+          </p>
+        </div>
+      )}
+
+      {/* Button */}
+      <div className="pb-8">
+        <button onClick={handleSave} disabled={saving}
+          className={`w-full disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors text-base ${
+            bereitsBezahlt
+              ? 'bg-green-600 hover:bg-green-700'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}>
+          {saving
+            ? (customerEmail ? 'Wird gespeichert und gesendet...' : 'Wird gespeichert...')
+            : bereitsBezahlt
+              ? `✓ Quittung ausstellen${customerEmail ? ' & per E-Mail senden' : ''}`
+              : `Rechnung ausstellen${customerEmail ? ' & per E-Mail senden' : ''}`
+          }
         </button>
       </div>
     </div>
