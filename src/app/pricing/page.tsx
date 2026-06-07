@@ -14,10 +14,10 @@ const PLANS = [
     ctaStyle: 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white',
     features: [
       { text: '3 Rechnungen pro Monat', included: true },
-      { text: 'Ausgaben pro Monat', included: false },
       { text: '1 Benutzer', included: true },
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
+      { text: 'Ausgaben pro Monat', included: false },
       { text: 'Logo auf Rechnungen', included: false },
       { text: 'Steuerexport PDF', included: false },
       { text: 'CSV Export', included: false },
@@ -40,10 +40,10 @@ const PLANS = [
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
       { text: 'Logo auf Rechnungen', included: true },
-      { text: 'Steuerexport PDF', included: true },
       { text: 'CSV Export', included: true },
       { text: 'E-Mail Versand', included: true },
       { text: 'Kein Wasserzeichen', included: true },
+      { text: 'Steuerexport PDF', included: false },
     ],
   },
   {
