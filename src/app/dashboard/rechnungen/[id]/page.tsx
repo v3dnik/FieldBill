@@ -28,10 +28,7 @@ function formatDate(ts: any) {
   return d.toLocaleDateString('de-CH');
 }
 
-// ── EMAIL MODAL ──
-function EmailModal({
-  invoice, company, onClose, onSent,
-}: {
+function EmailModal({ invoice, company, onClose, onSent }: {
   invoice: InvoiceDoc; company: CompanyDoc | null; onClose: () => void; onSent: () => void;
 }) {
   const [to, setTo] = useState(invoice.customerEmail || '');
@@ -134,13 +131,11 @@ function EmailModal({
   );
 }
 
-// ── SUCCESS TOAST ──
 function SuccessToast({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000);
     return () => clearTimeout(t);
   }, [onClose]);
-
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-green-600 text-white px-5 py-3.5 rounded-xl shadow-lg">
       <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -156,7 +151,6 @@ function SuccessToast({ message, onClose }: { message: string; onClose: () => vo
   );
 }
 
-// ── MAIN PAGE ──
 export default function RechnungDetailPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -213,202 +207,19 @@ export default function RechnungDetailPage() {
     if (!invoice || !company) return;
     setGeneratingPDF(true);
     try {
-      const { default: jsPDF } = await import('jspdf');
-      const { default: autoTable } = await import('jspdf-autotable');
-
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const vatEnabled = company.vatEnabled ?? false;
-
-      // ── HEADER ──
-      pdf.setFillColor(26, 86, 219);
-      pdf.rect(0, 0, pageWidth, 38, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(22); pdf.setFont('helvetica', 'bold');
-      pdf.text(company.name || 'Firma', 14, 14);
-      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
-      if (company.address?.street) pdf.text(company.address.street, 14, 21);
-      if (company.address?.city) pdf.text(`${company.address.zip} ${company.address.city}`, 14, 26);
-      if (company.phone) pdf.text(company.phone, 14, 31);
-      if (company.contactEmail) pdf.text(company.contactEmail, 14, 36);
-
-      pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
-      pdf.text('RECHNUNG', pageWidth - 14, 14, { align: 'right' });
-      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
-      pdf.text(invoice.invoiceNumber, pageWidth - 14, 21, { align: 'right' });
-      pdf.text(`Datum: ${formatDate(invoice.issueDate)}`, pageWidth - 14, 27, { align: 'right' });
-      if ((invoice as any).dueDate) pdf.text(`Faellig: ${formatDate((invoice as any).dueDate)}`, pageWidth - 14, 33, { align: 'right' });
-
-      // ── STATUS BADGE ──
-      const statusColors: Record<string, [number, number, number]> = {
-        draft: [107, 114, 128], issued: [37, 99, 235], paid: [22, 163, 74], cancelled: [220, 38, 38],
-      };
-      const statusLabels: Record<string, string> = {
-        draft: 'ENTWURF', issued: 'AUSGESTELLT', paid: 'BEZAHLT', cancelled: 'STORNIERT',
-      };
-      const sc = statusColors[invoice.status] || [107, 114, 128];
-      pdf.setFillColor(...sc);
-      pdf.roundedRect(14, 42, 35, 8, 2, 2, 'F');
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(7); pdf.setFont('helvetica', 'bold');
-      pdf.text(statusLabels[invoice.status] || invoice.status.toUpperCase(), 31.5, 47.5, { align: 'center' });
-
-      // ── EMPFAENGER ──
-      pdf.setTextColor(107, 114, 128); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
-      pdf.text('RECHNUNGSEMPFAENGER', 14, 58);
-      pdf.setTextColor(17, 24, 39); pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
-      pdf.text(invoice.customerName, 14, 65);
-      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
-      if (invoice.customerAddress?.street) {
-        pdf.setTextColor(55, 65, 81);
-        pdf.text(invoice.customerAddress.street, 14, 71);
-        pdf.text(`${invoice.customerAddress.zip} ${invoice.customerAddress.city}`, 14, 76);
-      }
-      if (invoice.customerEmail) { pdf.setTextColor(107, 114, 128); pdf.text(invoice.customerEmail, 14, 82); }
-
-      // ── POSITIONEN ──
-      const lines = invoice.lines || [];
-      const tableBody = lines.map(line => [
-        line.name + (line.description ? `\n${line.description}` : ''),
-        line.quantity.toString(), line.unit,
-        formatCHF(line.unitPriceRappen), formatCHF(line.totalRappen),
-      ]);
-
-      autoTable(pdf, {
-        startY: 90,
-        head: [['Bezeichnung', 'Menge', 'Einheit', 'Preis', 'Total']],
-        body: tableBody, theme: 'grid',
-        headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-        bodyStyles: { fontSize: 9, textColor: [55, 65, 81] },
-        columnStyles: {
-          0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 20 },
-          2: { halign: 'center', cellWidth: 20 }, 3: { halign: 'right', cellWidth: 28 },
-          4: { halign: 'right', cellWidth: 28, fontStyle: 'bold' },
-        },
-        alternateRowStyles: { fillColor: [249, 250, 251] },
+      const res = await fetch('/api/generate-invoice-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice, company }),
       });
-
-      let y = (pdf as any).lastAutoTable.finalY + 6;
-      const totalsX = pageWidth - 80;
-      const totalsW = 66;
-
-      pdf.setFontSize(9); pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
-      pdf.text('Subtotal:', totalsX, y);
-      pdf.setTextColor(55, 65, 81);
-      pdf.text(formatCHF(invoice.subtotalRappen), pageWidth - 14, y, { align: 'right' });
-      y += 6;
-
-      if (vatEnabled && invoice.vatRappen > 0) {
-        pdf.setTextColor(107, 114, 128);
-        pdf.text(`MwSt ${((invoice.vatRate || 0.081) * 100).toFixed(1)}%:`, totalsX, y);
-        pdf.setTextColor(55, 65, 81);
-        pdf.text(formatCHF(invoice.vatRappen), pageWidth - 14, y, { align: 'right' });
-        y += 6;
-      } else if (!vatEnabled) {
-        pdf.setTextColor(107, 114, 128);
-        pdf.text('MwSt: nicht pflichtig', totalsX, y);
-        y += 6;
-      }
-
-      pdf.setDrawColor(26, 86, 219); pdf.setLineWidth(0.5);
-      pdf.line(totalsX, y, pageWidth - 14, y); y += 5;
-      pdf.setFillColor(26, 86, 219);
-      pdf.roundedRect(totalsX - 4, y - 4, totalsW + 4, 12, 2, 2, 'F');
-      pdf.setTextColor(255, 255, 255); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold');
-      pdf.text('TOTAL CHF:', totalsX, y + 4);
-      pdf.text(formatCHF(invoice.totalRappen), pageWidth - 14, y + 4, { align: 'right' });
-      y += 18;
-
-      // ── ZAHLUNGSINFOS ──
-      if (y > 200) { pdf.addPage(); y = 20; }
-      pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(17, 24, 39);
-      pdf.text('Zahlungsinformationen', 14, y); y += 6;
-      pdf.setDrawColor(229, 231, 235); pdf.setLineWidth(0.3);
-      pdf.line(14, y, pageWidth - 14, y); y += 5;
-      pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(107, 114, 128);
-      pdf.text('Zahlungsmethode:', 14, y);
-      pdf.setTextColor(55, 65, 81); pdf.setFont('helvetica', 'bold');
-      pdf.text(ZAHLUNG_LABELS[invoice.paymentMethod] || invoice.paymentMethod, 60, y); y += 6;
-      if ((invoice as any).zahlungsfrist) {
-        pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
-        pdf.text('Zahlungsfrist:', 14, y);
-        pdf.setTextColor(55, 65, 81); pdf.setFont('helvetica', 'bold');
-        pdf.text(`${(invoice as any).zahlungsfrist} Tage`, 60, y); y += 6;
-      }
-      if (company.bankDetails?.iban) {
-        pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
-        pdf.text('IBAN:', 14, y);
-        pdf.setTextColor(55, 65, 81); pdf.setFont('helvetica', 'bold');
-        pdf.text(company.bankDetails.iban, 60, y); y += 6;
-      }
-      if (company.bankDetails?.bankName) {
-        pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
-        pdf.text('Bank:', 14, y);
-        pdf.setTextColor(55, 65, 81); pdf.setFont('helvetica', 'bold');
-        pdf.text(company.bankDetails.bankName, 60, y); y += 6;
-      }
-      if (company.vatNumber && vatEnabled) {
-        pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
-        pdf.text('MwSt-Nr:', 14, y);
-        pdf.setTextColor(55, 65, 81); pdf.setFont('helvetica', 'bold');
-        pdf.text(company.vatNumber, 60, y); y += 6;
-      }
-      if (invoice.notes) {
-        y += 4;
-        pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(17, 24, 39);
-        pdf.text('Bemerkungen', 14, y); y += 6;
-        pdf.setDrawColor(229, 231, 235); pdf.line(14, y, pageWidth - 14, y); y += 5;
-        pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(55, 65, 81);
-        const noteLines = pdf.splitTextToSize(invoice.notes, pageWidth - 28);
-        pdf.text(noteLines, 14, y);
-        y += noteLines.length * 5 + 4;
-      }
-
-      // ── SWISS QR BILL ──
-      const iban = company.bankDetails?.qrIban || company.bankDetails?.iban || '';
-      if (iban) {
-        try {
-          const { SwissQRBill } = await import('swissqrbill/pdf');
-
-          const qrData = {
-  currency: 'CHF' as const,
-  amount: invoice.totalRappen / 100,
-  creditor: {
-    name: company.name,
-    address: company.address?.street || '',
-    zip: parseInt(company.address?.zip || '0'),
-    city: company.address?.city || '',
-    country: 'CH' as const,
-    account: (company.bankDetails?.iban || '').replace(/\s/g, ''),
-  },
-  debtor: {
-    name: invoice.customerName,
-    address: invoice.customerAddress?.street || '',
-    zip: parseInt(invoice.customerAddress?.zip || '0'),
-    city: invoice.customerAddress?.city || '',
-    country: 'CH' as const,
-  },
-  message: invoice.invoiceNumber,
-};
-
-          const qrBill = new SwissQRBill(qrData);
-          qrBill.attachTo(pdf as any);
-
-        } catch (qrErr) {
-          console.warn('QR Bill konnte nicht generiert werden:', qrErr);
-        }
-      }
-      // ── FOOTER ──
-      const pages = pdf.getNumberOfPages();
-      for (let i = 1; i <= pages; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(7); pdf.setTextColor(156, 163, 175); pdf.setFont('helvetica', 'normal');
-        pdf.text(`Seite ${i} von ${pages}`, pageWidth / 2, 290, { align: 'center' });
-        pdf.text('Gemaess OR Art. 958f werden alle Rechnungen 10 Jahre archiviert.', pageWidth / 2, 285, { align: 'center' });
-        pdf.text('Entwickelt von Vodnik Digital Solutions — vodnik.ch', pageWidth / 2, 294, { align: 'center' });
-      }
-
-      pdf.save(`${invoice.invoiceNumber}.pdf`);
+      if (!res.ok) throw new Error('PDF-Generierung fehlgeschlagen.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${invoice.invoiceNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
       setError('PDF-Generierung fehlgeschlagen.');
