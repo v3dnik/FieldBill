@@ -9,6 +9,7 @@ export type UserRole = 'boss' | 'employee';
 export type PaymentMethod = 'bar' | 'twint' | 'karte' | 'rechnung';
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'cancelled';
 export type KundeTyp = 'firma' | 'privat';
+export type PlanType = 'free' | 'pro' | 'business';
 
 export type Address = {
   street: string;
@@ -27,6 +28,50 @@ export type BankDetails = {
   iban: string;
   qrIban: string;
   bankName: string;
+};
+
+export type PlanLimits = {
+  invoicesPerMonth: number | null;  // null = neomejeno
+  expensesPerMonth: number | null;  // null = neomejeno
+  maxMembers: number;
+  emailSending: boolean;
+  steuerexport: boolean;
+  csvExport: boolean;
+  logoOnInvoices: boolean;
+  watermark: boolean;
+};
+
+export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
+  free: {
+    invoicesPerMonth: 3,
+    expensesPerMonth: 0,
+    maxMembers: 1,
+    emailSending: false,
+    steuerexport: false,
+    csvExport: false,
+    logoOnInvoices: false,
+    watermark: true,
+  },
+  pro: {
+    invoicesPerMonth: 50,
+    expensesPerMonth: 50,
+    maxMembers: 3,
+    emailSending: true,
+    steuerexport: false,
+    csvExport: false,
+    logoOnInvoices: true,
+    watermark: false,
+  },
+  business: {
+    invoicesPerMonth: null,
+    expensesPerMonth: null,
+    maxMembers: 50,
+    emailSending: true,
+    steuerexport: true,
+    csvExport: true,
+    logoOnInvoices: true,
+    watermark: false,
+  },
 };
 
 export type UserDoc = {
@@ -54,6 +99,12 @@ export type CompanyDoc = {
   currency: string;
   invoiceSettings: InvoiceSettings;
   bankDetails?: BankDetails;
+  // ── PLAN ──
+  plan: PlanType;
+  planExpiresAt?: Timestamp;
+  trialEndsAt?: Timestamp;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
   createdAt: Timestamp;
 };
 
@@ -159,30 +210,22 @@ export type ExpenseDoc = {
   updatedAt?: Timestamp;
 };
 
-// ───────────────────────────────────────────────────────
-//  KUNDE DOCUMENT  →  /companies/{companyId}/kunden/{kundeId}
-// ───────────────────────────────────────────────────────
-
 export type KundeDoc = {
   kundeId: string;
-  typ: KundeTyp;              // 'firma' | 'privat'
+  typ: KundeTyp;
 
-  // Firma felder
-  firmenname?: string;        // nur bei typ='firma'
-  ansprechpartner?: string;   // z.B. "Hans Müller"
-  uid?: string;               // MwSt-Nr der Firma
+  firmenname?: string;
+  ansprechpartner?: string;
+  uid?: string;
 
-  // Privat felder
-  vorname?: string;           // nur bei typ='privat'
-  nachname?: string;          // nur bei typ='privat'
+  vorname?: string;
+  nachname?: string;
 
-  // Gemeinsam
   email?: string;
   phone?: string;
   address?: Address;
   notizen?: string;
 
-  // Statistik (wird automatisch aktualisiert)
   rechnungenAnzahl?: number;
   rechnungenTotalRappen?: number;
 
