@@ -6,6 +6,7 @@ import { doc, getDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
+import { usePlan } from '@/hooks/usePlan';
 import { ExpenseCategory } from '@/types/firestore';
 
 const KATEGORIEN: ExpenseCategory[] = [
@@ -17,6 +18,14 @@ const KATEGORIEN: ExpenseCategory[] = [
 export default function NeuAusgabePage() {
   const { user } = useAuth();
   const router = useRouter();
+  const {
+    canCreateExpense,
+    expensesThisMonth,
+    limits,
+    isReadOnly,
+    loading: planLoading,
+  } = usePlan();
+
   const [companyId, setCompanyId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,6 +60,12 @@ export default function NeuAusgabePage() {
 
   const handleSubmit = async () => {
     if (!user || !companyId) return;
+    if (!canCreateExpense) {
+      setError(isReadOnly
+        ? 'Ihr Plan ist abgelaufen — Read-only Modus.'
+        : `Sie haben das Limit von ${limits.expensesPerMonth} Ausgaben pro Monat erreicht. Bitte upgraden Sie Ihren Plan.`);
+      return;
+    }
     if (!betrag || isNaN(parseFloat(betrag))) { setError('Gültiger Betrag erforderlich.'); return; }
     if (!beschreibung.trim()) { setError('Beschreibung erforderlich.'); return; }
     if (!datum) { setError('Datum erforderlich.'); return; }
@@ -97,6 +112,41 @@ export default function NeuAusgabePage() {
         <p className="text-gray-500 dark:text-gray-400 mt-1">Geschäftsausgabe erfassen.</p>
       </div>
 
+      {/* Plan Limit / Read-only Banner */}
+      {!planLoading && !canCreateExpense && (
+        <div className={`mb-6 rounded-xl p-4 border ${
+          isReadOnly
+            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              {isReadOnly ? (
+                <>
+                  <p className="font-semibold text-sm text-orange-700 dark:text-orange-300">🔒 Ihr Plan ist abgelaufen</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
+                    Read-only Modus — bestehende Daten sind sicher archiviert.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-sm text-red-700 dark:text-red-300">🚫 Monatliches Limit erreicht</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+                    Sie haben {expensesThisMonth} von {limits.expensesPerMonth} Ausgaben diesen Monat erfasst.
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => router.push('/pricing')}
+              className={`text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+                isReadOnly ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+              }`}>
+              {isReadOnly ? 'Plan erneuern →' : 'Plan upgraden →'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-5">
         {error && (
           <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
@@ -108,19 +158,19 @@ export default function NeuAusgabePage() {
             Betrag (CHF) <span className="text-red-500">*</span>
           </label>
           <input type="number" value={betrag} onChange={e => setBetrag(e.target.value)}
-            placeholder="0.00" min="0" step="0.05" className={inputClass} />
+            placeholder="0.00" min="0" step="0.05" className={inputClass} disabled={!canCreateExpense} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Datum <span className="text-red-500">*</span>
           </label>
-          <input type="date" value={datum} onChange={e => setDatum(e.target.value)} className={inputClass} />
+          <input type="date" value={datum} onChange={e => setDatum(e.target.value)} className={inputClass} disabled={!canCreateExpense} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Kategorie <span className="text-red-500">*</span>
           </label>
-          <select value={kategorie} onChange={e => setKategorie(e.target.value as ExpenseCategory)} className={inputClass}>
+          <select value={kategorie} onChange={e => setKategorie(e.target.value as ExpenseCategory)} className={inputClass} disabled={!canCreateExpense}>
             {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
           </select>
           {kategorie === 'Abschreibungen' && (
@@ -139,14 +189,14 @@ export default function NeuAusgabePage() {
             Beschreibung <span className="text-red-500">*</span>
           </label>
           <input type="text" value={beschreibung} onChange={e => setBeschreibung(e.target.value)}
-            placeholder="z.B. Abschreibung VW Crafter 2024" className={inputClass} />
+            placeholder="z.B. Abschreibung VW Crafter 2024" className={inputClass} disabled={!canCreateExpense} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Beleg <span className="text-gray-400 text-xs">(optional — Foto oder PDF, max. 10MB)</span>
           </label>
           <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-500 transition-colors">
-            <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden" id="beleg-upload" />
+            <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden" id="beleg-upload" disabled={!canCreateExpense} />
             <label htmlFor="beleg-upload" className="cursor-pointer">
               {belegPreview ? (
                 <img src={belegPreview} alt="Beleg" className="max-h-40 mx-auto rounded-lg" />
@@ -176,8 +226,8 @@ export default function NeuAusgabePage() {
             className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium py-2.5 rounded-lg transition-colors">
             Abbrechen
           </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors">
+          <button onClick={handleSubmit} disabled={saving || !canCreateExpense}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors">
             {uploadProgress || (saving ? 'Wird gespeichert...' : 'Speichern')}
           </button>
         </div>

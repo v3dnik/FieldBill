@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
+import { usePlan } from '@/hooks/usePlan';
 import { ExpenseDoc, ExpenseCategory, MembershipDoc } from '@/types/firestore';
 
 const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
@@ -49,6 +50,14 @@ function toDateInputValue(ts: any): string {
 export default function AusgabenPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const {
+    canCreateExpense,
+    expensesThisMonth,
+    limits,
+    isReadOnly,
+    loading: planLoading,
+  } = usePlan();
+
   const [expenses, setExpenses] = useState<ExpenseDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState('');
@@ -140,11 +149,54 @@ export default function AusgabenPage() {
             {isBoss ? 'Alle Ausgaben der Firma.' : 'Ihre eigenen Ausgaben.'}
           </p>
         </div>
-        <button onClick={() => router.push('/dashboard/ausgaben/neu')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
-          + Neu
-        </button>
+        {canCreateExpense ? (
+          <button onClick={() => router.push('/dashboard/ausgaben/neu')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
+            + Neu
+          </button>
+        ) : (
+          <button disabled
+            title={isReadOnly ? 'Plan abgelaufen — Read-only Modus' : 'Monatliches Limit erreicht'}
+            className="bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 font-medium px-4 py-2 rounded-lg cursor-not-allowed">
+            + Neu
+          </button>
+        )}
       </div>
+
+      {/* Plan Limit / Read-only Banner */}
+      {!planLoading && !canCreateExpense && (
+        <div className={`mb-6 rounded-xl p-4 border ${
+          isReadOnly
+            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              {isReadOnly ? (
+                <>
+                  <p className="font-semibold text-sm text-orange-700 dark:text-orange-300">🔒 Ihr Plan ist abgelaufen</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
+                    Read-only Modus — bestehende Daten sind sicher archiviert.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-sm text-red-700 dark:text-red-300">🚫 Monatliches Limit erreicht</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+                    Sie haben {expensesThisMonth} von {limits.expensesPerMonth} Ausgaben diesen Monat erfasst.
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => router.push('/pricing')}
+              className={`text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+                isReadOnly ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+              }`}>
+              {isReadOnly ? 'Plan erneuern →' : 'Plan upgraden →'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       {!loading && expenses.length > 0 && (
@@ -188,7 +240,7 @@ export default function AusgabenPage() {
           <p className="text-gray-500 dark:text-gray-400 text-lg">
             {filter === 'all' ? 'Noch keine Ausgaben erfasst.' : 'Keine Ausgaben in dieser Kategorie.'}
           </p>
-          {filter === 'all' && (
+          {filter === 'all' && canCreateExpense && (
             <button onClick={() => router.push('/dashboard/ausgaben/neu')}
               className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
               Erste Ausgabe erfassen

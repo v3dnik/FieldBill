@@ -5,11 +5,20 @@ import { useRouter } from 'next/navigation';
 import { doc, getDoc, addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
+import { usePlan } from '@/hooks/usePlan';
 import { KundeTyp } from '@/types/firestore';
 
 export default function NeuKundePage() {
   const { user } = useAuth();
   const router = useRouter();
+  const {
+    canAddKunde,
+    kundenCount,
+    limits,
+    isReadOnly,
+    loading: planLoading,
+  } = usePlan();
+
   const [companyId, setCompanyId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +52,12 @@ export default function NeuKundePage() {
 
   const handleSave = async () => {
     if (!user || !companyId) return;
+    if (!canAddKunde) {
+      setError(isReadOnly
+        ? 'Ihr Plan ist abgelaufen — Read-only Modus.'
+        : `Sie haben das Limit von ${limits.maxKunden} Kunden erreicht. Bitte upgraden Sie Ihren Plan.`);
+      return;
+    }
     if (typ === 'firma' && !firmenname.trim()) { setError('Firmenname ist erforderlich.'); return; }
     if (typ === 'privat' && !nachname.trim()) { setError('Nachname ist erforderlich.'); return; }
     setSaving(true); setError('');
@@ -93,6 +108,41 @@ export default function NeuKundePage() {
         <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Kunden erfassen und speichern.</p>
       </div>
 
+      {/* Plan Limit / Read-only Banner */}
+      {!planLoading && !canAddKunde && (
+        <div className={`rounded-xl p-4 border ${
+          isReadOnly
+            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              {isReadOnly ? (
+                <>
+                  <p className="font-semibold text-sm text-orange-700 dark:text-orange-300">🔒 Ihr Plan ist abgelaufen</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
+                    Read-only Modus — bestehende Daten sind sicher archiviert.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-sm text-red-700 dark:text-red-300">🚫 Kunden-Limit erreicht</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+                    Sie haben {kundenCount} von {limits.maxKunden} möglichen Kunden gespeichert.
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => router.push('/pricing')}
+              className={`text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+                isReadOnly ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+              }`}>
+              {isReadOnly ? 'Plan erneuern →' : 'Plan upgraden →'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
           {error}
@@ -103,8 +153,8 @@ export default function NeuKundePage() {
       <div className={sectionClass}>
         <p className={labelClass}>Kundentyp <span className="text-red-500">*</span></p>
         <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => setTyp('firma')}
-            className={`p-4 rounded-xl border-2 text-left transition-colors ${
+          <button onClick={() => setTyp('firma')} disabled={!canAddKunde}
+            className={`p-4 rounded-xl border-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               typ === 'firma'
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
@@ -113,8 +163,8 @@ export default function NeuKundePage() {
             <p className="font-medium text-gray-900 dark:text-white text-sm">Firma</p>
             <p className="text-xs text-gray-400 mt-0.5">GmbH, AG, Einzelfirma</p>
           </button>
-          <button onClick={() => setTyp('privat')}
-            className={`p-4 rounded-xl border-2 text-left transition-colors ${
+          <button onClick={() => setTyp('privat')} disabled={!canAddKunde}
+            className={`p-4 rounded-xl border-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               typ === 'privat'
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
@@ -136,17 +186,17 @@ export default function NeuKundePage() {
             <div>
               <label className={labelClass}>Firmenname <span className="text-red-500">*</span></label>
               <input type="text" value={firmenname} onChange={e => setFirmenname(e.target.value)}
-                placeholder="z.B. Müller Transport AG" className={inputClass} />
+                placeholder="z.B. Müller Transport AG" className={inputClass} disabled={!canAddKunde} />
             </div>
             <div>
               <label className={labelClass}>Ansprechpartner <span className="text-gray-400 text-xs">(optional)</span></label>
               <input type="text" value={ansprechpartner} onChange={e => setAnsprechpartner(e.target.value)}
-                placeholder="z.B. Hans Müller" className={inputClass} />
+                placeholder="z.B. Hans Müller" className={inputClass} disabled={!canAddKunde} />
             </div>
             <div>
               <label className={labelClass}>UID / MwSt-Nr <span className="text-gray-400 text-xs">(optional)</span></label>
               <input type="text" value={uid} onChange={e => setUid(e.target.value)}
-                placeholder="CHE-123.456.789 MWST" className={`${inputClass} font-mono`} />
+                placeholder="CHE-123.456.789 MWST" className={`${inputClass} font-mono`} disabled={!canAddKunde} />
             </div>
           </>
         ) : (
@@ -154,12 +204,12 @@ export default function NeuKundePage() {
             <div>
               <label className={labelClass}>Vorname</label>
               <input type="text" value={vorname} onChange={e => setVorname(e.target.value)}
-                placeholder="Hans" className={inputClass} />
+                placeholder="Hans" className={inputClass} disabled={!canAddKunde} />
             </div>
             <div>
               <label className={labelClass}>Nachname <span className="text-red-500">*</span></label>
               <input type="text" value={nachname} onChange={e => setNachname(e.target.value)}
-                placeholder="Müller" className={inputClass} />
+                placeholder="Müller" className={inputClass} disabled={!canAddKunde} />
             </div>
           </div>
         )}
@@ -171,12 +221,12 @@ export default function NeuKundePage() {
         <div>
           <label className={labelClass}>E-Mail</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="kunde@beispiel.ch" className={inputClass} />
+            placeholder="kunde@beispiel.ch" className={inputClass} disabled={!canAddKunde} />
         </div>
         <div>
           <label className={labelClass}>Telefon</label>
           <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-            placeholder="+41 79 123 45 67" className={inputClass} />
+            placeholder="+41 79 123 45 67" className={inputClass} disabled={!canAddKunde} />
         </div>
       </div>
 
@@ -186,18 +236,18 @@ export default function NeuKundePage() {
         <div>
           <label className={labelClass}>Strasse</label>
           <input type="text" value={street} onChange={e => setStreet(e.target.value)}
-            placeholder="Bahnhofstrasse 1" className={inputClass} />
+            placeholder="Bahnhofstrasse 1" className={inputClass} disabled={!canAddKunde} />
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className={labelClass}>PLZ</label>
             <input type="text" value={zip} onChange={e => setZip(e.target.value)}
-              placeholder="8001" className={inputClass} />
+              placeholder="8001" className={inputClass} disabled={!canAddKunde} />
           </div>
           <div className="col-span-2">
             <label className={labelClass}>Ort</label>
             <input type="text" value={city} onChange={e => setCity(e.target.value)}
-              placeholder="Zürich" className={inputClass} />
+              placeholder="Zürich" className={inputClass} disabled={!canAddKunde} />
           </div>
         </div>
       </div>
@@ -207,7 +257,7 @@ export default function NeuKundePage() {
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">Notizen</h2>
         <textarea value={notizen} onChange={e => setNotizen(e.target.value)}
           placeholder="Interne Notizen zu diesem Kunden..."
-          rows={3} className={`${inputClass} resize-none`} />
+          rows={3} className={`${inputClass} resize-none`} disabled={!canAddKunde} />
       </div>
 
       {/* Buttons */}
@@ -216,8 +266,8 @@ export default function NeuKundePage() {
           className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white font-medium py-3 rounded-lg transition-colors">
           Abbrechen
         </button>
-        <button onClick={handleSave} disabled={saving}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors">
+        <button onClick={handleSave} disabled={saving || !canAddKunde}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors">
           {saving ? 'Wird gespeichert...' : 'Kunde speichern'}
         </button>
       </div>

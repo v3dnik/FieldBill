@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
+import { usePlan } from '@/hooks/usePlan';
 import { KundeDoc } from '@/types/firestore';
 
 function getDisplayName(k: KundeDoc): string {
@@ -21,6 +22,8 @@ function getSubtitle(k: KundeDoc): string {
 export default function KundenPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { limits, isReadOnly, loading: planLoading } = usePlan();
+
   const [kunden, setKunden] = useState<KundeDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState('');
@@ -45,6 +48,10 @@ export default function KundenPage() {
     };
     init();
   }, [user]);
+
+  // Živo preverjanje limita Kunden (uporabi aktualno število iz seznama)
+  const canAddKunde = !isReadOnly &&
+    (limits.maxKunden === null || kunden.length < limits.maxKunden);
 
   const handleDelete = async (kundeId: string) => {
     if (!companyId) return;
@@ -75,13 +82,57 @@ export default function KundenPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Kunden</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
             {kunden.length} {kunden.length === 1 ? 'Kunde' : 'Kunden'} gespeichert
+            {limits.maxKunden !== null && ` (max. ${limits.maxKunden})`}
           </p>
         </div>
-        <button onClick={() => router.push('/dashboard/kunden/neu')}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
-          + Neu
-        </button>
+        {canAddKunde ? (
+          <button onClick={() => router.push('/dashboard/kunden/neu')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">
+            + Neu
+          </button>
+        ) : (
+          <button disabled
+            title={isReadOnly ? 'Plan abgelaufen — Read-only Modus' : 'Kunden-Limit erreicht'}
+            className="bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 font-medium px-4 py-2 rounded-lg cursor-not-allowed">
+            + Neu
+          </button>
+        )}
       </div>
+
+      {/* Plan Limit / Read-only Banner */}
+      {!planLoading && !canAddKunde && (
+        <div className={`mb-5 rounded-xl p-4 border ${
+          isReadOnly
+            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              {isReadOnly ? (
+                <>
+                  <p className="font-semibold text-sm text-orange-700 dark:text-orange-300">🔒 Ihr Plan ist abgelaufen</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
+                    Read-only Modus — bestehende Daten sind sicher archiviert.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-sm text-red-700 dark:text-red-300">🚫 Kunden-Limit erreicht</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+                    Sie haben {kunden.length} von {limits.maxKunden} möglichen Kunden gespeichert.
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => router.push('/pricing')}
+              className={`text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+                isReadOnly ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+              }`}>
+              {isReadOnly ? 'Plan erneuern →' : 'Plan upgraden →'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Suche + Filter */}
       {kunden.length > 0 && (
@@ -115,7 +166,7 @@ export default function KundenPage() {
           <p className="text-gray-500 dark:text-gray-400">
             {kunden.length === 0 ? 'Noch keine Kunden erfasst.' : 'Keine Kunden gefunden.'}
           </p>
-          {kunden.length === 0 && (
+          {kunden.length === 0 && canAddKunde && (
             <button onClick={() => router.push('/dashboard/kunden/neu')}
               className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors">
               Ersten Kunden erfassen
