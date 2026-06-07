@@ -368,7 +368,7 @@ export default function RechnungDetailPage() {
       const iban = company.bankDetails?.qrIban || company.bankDetails?.iban || '';
       if (iban) {
         try {
-          const SwissQRBill = await import('swissqrbill');
+          const { SwissQRBill } = await import('swissqrbill/pdf');
 
           const qrData = {
             currency: 'CHF' as const,
@@ -376,7 +376,7 @@ export default function RechnungDetailPage() {
             creditor: {
               name: company.name,
               address: company.address?.street || '',
-              zip: company.address?.zip || '',
+              zip: parseInt(company.address?.zip || '0'),
               city: company.address?.city || '',
               country: 'CH' as const,
               account: iban.replace(/\s/g, ''),
@@ -384,14 +384,15 @@ export default function RechnungDetailPage() {
             debtor: {
               name: invoice.customerName,
               address: invoice.customerAddress?.street || '',
-              zip: invoice.customerAddress?.zip || '',
+              zip: parseInt(invoice.customerAddress?.zip || '0'),
               city: invoice.customerAddress?.city || '',
               country: 'CH' as const,
             },
             message: invoice.invoiceNumber,
           };
 
-          await SwissQRBill.swissQRBill(qrData, pdf as any);
+          const qrBill = new SwissQRBill(qrData);
+          qrBill.attachTo(pdf as any);
 
         } catch (qrErr) {
           console.warn('QR Bill konnte nicht generiert werden:', qrErr);
