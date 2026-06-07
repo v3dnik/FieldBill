@@ -219,57 +219,30 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Vergleich */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 mb-16">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
-            Warum FieldBill?
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Anbieter</th>
-                  <th className="text-right py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Preis/Monat</th>
-                  <th className="text-right py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Swiss QR</th>
-                  <th className="text-right py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Mobil</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/10">
-                  <td className="py-3 px-4 font-bold text-blue-600 dark:text-blue-400">FieldBill Pro</td>
-                  <td className="py-3 px-4 text-right font-bold text-blue-600 dark:text-blue-400">CHF 39</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Bexio Small</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 35</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                  <td className="py-3 px-4 text-right text-gray-400">teilweise</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Bexio Medium</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 59</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                  <td className="py-3 px-4 text-right text-gray-400">teilweise</td>
-                </tr>
-                <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">AbaNinja</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 29+</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                  <td className="py-3 px-4 text-right text-gray-400">teilweise</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4 text-gray-700 dark:text-gray-300">Magic Heidi</td>
-                  <td className="py-3 px-4 text-right text-gray-500">CHF 30</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                  <td className="py-3 px-4 text-right text-green-500">✓</td>
-                </tr>
-              </tbody>
-            </table>
+        {/* Vorteile */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 text-center">
+            <div className="text-4xl mb-4">🇨🇭</div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Swiss QR-Rechnung</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Vollständig konform mit dem Schweizer Zahlungsstandard. Swiss QR-Code auf jeder Rechnung — direkt druckfertig.
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 text-center">
+            <div className="text-4xl mb-4">⚡</div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Einfach & Schnell</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Rechnung in unter 2 Minuten erstellen — ohne Buchhaltungskenntnisse. Übersichtlich, mobil, intuitiv.
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 text-center">
+            <div className="text-4xl mb-4">💰</div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Faire Preise</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Keine versteckten Kosten. Kein Setup-Gebühr. Entwickelt für Schweizer KMU — zu einem Preis der sich lohnt.
+            </p>
           </div>
         </div>
-
         {/* FAQ */}
         <div className="max-w-2xl mx-auto mb-16">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8 text-center">
