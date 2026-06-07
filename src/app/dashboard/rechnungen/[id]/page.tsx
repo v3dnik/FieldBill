@@ -371,25 +371,25 @@ export default function RechnungDetailPage() {
           const { SwissQRBill } = await import('swissqrbill/pdf');
 
           const qrData = {
-            currency: 'CHF' as const,
-            amount: invoice.totalRappen / 100,
-            creditor: {
-              name: company.name,
-              address: company.address?.street || '',
-              zip: parseInt(company.address?.zip || '0'),
-              city: company.address?.city || '',
-              country: 'CH' as const,
-              account: iban.replace(/\s/g, ''),
-            },
-            debtor: {
-              name: invoice.customerName,
-              address: invoice.customerAddress?.street || '',
-              zip: parseInt(invoice.customerAddress?.zip || '0'),
-              city: invoice.customerAddress?.city || '',
-              country: 'CH' as const,
-            },
-            message: invoice.invoiceNumber,
-          };
+  currency: 'CHF' as const,
+  amount: invoice.totalRappen / 100,
+  creditor: {
+    name: company.name,
+    address: company.address?.street || '',
+    zip: parseInt(company.address?.zip || '0'),
+    city: company.address?.city || '',
+    country: 'CH' as const,
+    account: (company.bankDetails?.iban || '').replace(/\s/g, ''),
+  },
+  debtor: {
+    name: invoice.customerName,
+    address: invoice.customerAddress?.street || '',
+    zip: parseInt(invoice.customerAddress?.zip || '0'),
+    city: invoice.customerAddress?.city || '',
+    country: 'CH' as const,
+  },
+  message: invoice.invoiceNumber,
+};
 
           const qrBill = new SwissQRBill(qrData);
           qrBill.attachTo(pdf as any);
