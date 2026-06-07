@@ -14,7 +14,7 @@ const PLANS = [
     ctaStyle: 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white',
     features: [
       { text: '3 Rechnungen pro Monat', included: true },
-      { text: '0 Ausgaben pro Monat', included: true },
+      { text: 'Ausgaben pro Monat', included: false },
       { text: '1 Benutzer', included: true },
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
