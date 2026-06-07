@@ -14,7 +14,7 @@ const PLANS = [
     ctaStyle: 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white',
     features: [
       { text: '3 Rechnungen pro Monat', included: true },
-      { text: '6 Ausgaben pro Monat', included: true },
+      { text: '0 Ausgaben pro Monat', included: true },
       { text: '1 Benutzer', included: true },
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
@@ -34,15 +34,15 @@ const PLANS = [
     cta: '30 Tage kostenlos testen',
     ctaStyle: 'bg-blue-600 hover:bg-blue-700 text-white',
     features: [
-      { text: 'Unbegrenzte Rechnungen', included: true },
-      { text: 'Unbegrenzte Ausgaben', included: true },
-      { text: 'Bis zu 3 Benutzer', included: true },
+      { text: 'Bis zu 50 Rechnungen pro Monat', included: true },
+      { text: 'Bis zu 50 Ausgaben pro Monat', included: true },
+      { text: 'Bis zu 3 Mitarbeiter', included: true },
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
       { text: 'Logo auf Rechnungen', included: true },
       { text: 'Steuerexport PDF', included: true },
       { text: 'CSV Export', included: true },
-      { text: 'Mitarbeiter hinzufügen', included: false },
+      { text: 'E-Mail Versand', included: true },
       { text: 'Kein Wasserzeichen', included: true },
     ],
   },
@@ -57,13 +57,15 @@ const PLANS = [
     features: [
       { text: 'Unbegrenzte Rechnungen', included: true },
       { text: 'Unbegrenzte Ausgaben', included: true },
-      { text: 'Unbegrenzte Benutzer', included: true },
+      { text: 'Bis zu 50 Mitarbeiter', included: true },
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
       { text: 'Logo auf Rechnungen', included: true },
       { text: 'Steuerexport PDF', included: true },
       { text: 'CSV Export', included: true },
-      { text: 'Mitarbeiter hinzufügen', included: true },
+      { text: 'E-Mail Versand', included: true },
+      { text: 'Swiss QR-Rechnung', included: true },
+      { text: 'Prioritaets Support', included: true },
       { text: 'Kein Wasserzeichen', included: true },
     ],
   },
@@ -129,7 +131,6 @@ export default function PricingPage() {
             Entwickelt für Schweizer KMU — transparent, günstig, MWST-konform.
           </p>
 
-          {/* Toggle monatlich/jährlich */}
           <div className="flex items-center justify-center gap-3 mt-8">
             <span className={`text-sm font-medium ${!yearly ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>
               Monatlich
@@ -155,7 +156,6 @@ export default function PricingPage() {
             <div key={plan.name}
               className={`relative bg-white dark:bg-gray-900 rounded-2xl border-2 ${plan.color} p-8 flex flex-col`}>
 
-              {/* Badge */}
               {plan.badge && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="bg-blue-600 text-white text-xs font-bold px-4 py-1 rounded-full whitespace-nowrap">
@@ -164,13 +164,11 @@ export default function PricingPage() {
                 </div>
               )}
 
-              {/* Plan name */}
               <div className="mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{plan.name}</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{plan.description}</p>
               </div>
 
-              {/* Preis */}
               <div className="mb-6">
                 {plan.price.monthly === 0 ? (
                   <div>
@@ -193,14 +191,12 @@ export default function PricingPage() {
                 )}
               </div>
 
-              {/* CTA Button */}
               <button
                 onClick={() => router.push('/register')}
                 className={`w-full py-3 rounded-xl font-medium text-sm transition-colors mb-8 ${plan.ctaStyle}`}>
                 {plan.cta}
               </button>
 
-              {/* Features */}
               <ul className="space-y-3 flex-1">
                 {plan.features.map((feature, idx) => (
                   <li key={idx} className="flex items-center gap-3">
@@ -223,7 +219,7 @@ export default function PricingPage() {
           ))}
         </div>
 
-        {/* Vergleich Konkurrenz */}
+        {/* Vergleich */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 mb-16">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
             Warum FieldBill?
@@ -238,7 +234,7 @@ export default function PricingPage() {
                   <th className="text-right py-3 px-4 text-gray-500 dark:text-gray-400 font-medium">Mobil</th>
                 </tr>
               </thead>
-<tbody>
+              <tbody>
                 <tr className="border-b border-gray-100 dark:border-gray-800 bg-blue-50 dark:bg-blue-900/10">
                   <td className="py-3 px-4 font-bold text-blue-600 dark:text-blue-400">FieldBill Pro</td>
                   <td className="py-3 px-4 text-right font-bold text-blue-600 dark:text-blue-400">CHF 39</td>
