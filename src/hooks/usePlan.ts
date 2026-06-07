@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { PlanType, PLAN_LIMITS, PlanLimits } from '@/types/firestore';
@@ -56,37 +56,35 @@ export function usePlan(): UsePlanReturn {
         }
 
         const now = new Date();
-        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
 
-        // Računi ta mesec
-        const invoicesSnap = await getDocs(
-          query(
-            collection(db, 'companies', cId, 'invoices'),
-            where('dateKey', '>=', `${monthKey}-01`),
-            where('dateKey', '<=', `${monthKey}-31`)
-          )
-        );
-        setInvoicesThisMonth(invoicesSnap.size);
+        // Vse račune naložimo in filtriramo v JS
+        const invoicesSnap = await getDocs(collection(db, 'companies', cId, 'invoices'));
+        const invoiceCount = invoicesSnap.docs.filter(d => {
+          const dateKey = d.data().dateKey as string;
+          if (!dateKey) return false;
+          const [year, month] = dateKey.split('-').map(Number);
+          return year === currentYear && month === currentMonth + 1;
+        }).length;
+        setInvoicesThisMonth(invoiceCount);
 
-        // Ausgaben ta mesec
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const expensesSnap = await getDocs(
-          query(
-            collection(db, 'companies', cId, 'expenses'),
-            where('date', '>=', startOfMonth)
-          )
-        );
-        setExpensesThisMonth(expensesSnap.size);
+        // Vse ausgaben naložimo in filtriramo v JS
+        const expensesSnap = await getDocs(collection(db, 'companies', cId, 'expenses'));
+        const expenseCount = expensesSnap.docs.filter(d => {
+          const date = d.data().date?.toDate?.();
+          if (!date) return false;
+          return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+        }).length;
+        setExpensesThisMonth(expenseCount);
 
         // Mitarbeiter
-        const membersSnap = await getDocs(
-          query(
-            collection(db, 'memberships'),
-            where('companyId', '==', cId),
-            where('active', '==', true)
-          )
-        );
-        setMembersCount(membersSnap.size);
+        const membersSnap = await getDocs(collection(db, 'memberships'));
+        const memberCount = membersSnap.docs.filter(d => {
+          const data = d.data();
+          return data.companyId === cId && data.active === true;
+        }).length;
+        setMembersCount(memberCount);
 
       } catch (err) {
         console.error('usePlan error:', err);
@@ -106,25 +104,14 @@ export function usePlan(): UsePlanReturn {
     (limits.expensesPerMonth === null || (limits.expensesPerMonth > 0 && expensesThisMonth < limits.expensesPerMonth));
 
   const canAddMember = !isReadOnly && membersCount < limits.maxMembers;
-
   const canSendEmail = !isReadOnly && limits.emailSending;
   const canExportSteuer = !isReadOnly && limits.steuerexport;
   const canExportCsv = !isReadOnly && limits.csvExport;
 
   return {
-    plan,
-    limits,
-    isReadOnly,
-    companyId,
-    loading,
-    canCreateInvoice,
-    canCreateExpense,
-    canAddMember,
-    canSendEmail,
-    canExportSteuer,
-    canExportCsv,
-    invoicesThisMonth,
-    expensesThisMonth,
-    membersCount,
+    plan, limits, isReadOnly, companyId, loading,
+    canCreateInvoice, canCreateExpense, canAddMember,
+    canSendEmail, canExportSteuer, canExportCsv,
+    invoicesThisMonth, expensesThisMonth, membersCount,
   };
 }
