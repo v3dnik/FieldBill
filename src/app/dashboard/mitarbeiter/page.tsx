@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
+import { usePlan } from '@/hooks/usePlan';
 import { MembershipDoc, UserDoc, UserRole } from '@/types/firestore';
 
 interface Mitarbeiter {
@@ -23,6 +25,9 @@ function generateToken(): string {
 
 export default function MitarbeiterPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const { limits, isReadOnly, loading: planLoading } = usePlan();
+
   const [isLoading, setIsLoading] = useState(true);
   const [isBoss, setIsBoss] = useState(false);
   const [companyId, setCompanyId] = useState('');
@@ -38,6 +43,11 @@ export default function MitarbeiterPage() {
   const [generatedLink, setGeneratedLink] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // ── PLAN LIMIT (živo štetje aktivnih članov) ──
+  const activeMembersCount = mitarbeiter.filter(m => m.active).length;
+  const memberLimitReached = !planLoading && activeMembersCount >= limits.maxMembers;
+  const canInvite = !isReadOnly && !memberLimitReached;
 
   const showSuccess = (msg: string) => {
     setSuccess(msg);
@@ -96,6 +106,12 @@ export default function MitarbeiterPage() {
   }, [user]);
 
   const handleGenerateInvite = async () => {
+    if (!canInvite) {
+      setError(isReadOnly
+        ? 'Ihr Plan ist abgelaufen — Read-only Modus.'
+        : `Sie haben das Limit von ${limits.maxMembers} ${limits.maxMembers === 1 ? 'Mitglied' : 'Mitgliedern'} erreicht. Bitte upgraden Sie Ihren Plan.`);
+      return;
+    }
     setIsGenerating(true);
     setError('');
     try {
@@ -181,15 +197,59 @@ export default function MitarbeiterPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Mitarbeiter</h1>
           <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">
             {mitarbeiter.length} {mitarbeiter.length === 1 ? 'Person' : 'Personen'} im Team
+            {` (max. ${limits.maxMembers})`}
           </p>
         </div>
         {!showInviteForm && (
-          <button onClick={() => { setShowInviteForm(true); setGeneratedLink(''); }}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-            + Einladen
-          </button>
+          canInvite ? (
+            <button onClick={() => { setShowInviteForm(true); setGeneratedLink(''); }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+              + Einladen
+            </button>
+          ) : (
+            <button disabled
+              title={isReadOnly ? 'Plan abgelaufen — Read-only Modus' : 'Mitarbeiter-Limit erreicht'}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 text-sm font-medium rounded-lg cursor-not-allowed">
+              + Einladen
+            </button>
+          )
         )}
       </div>
+
+      {/* Plan Limit / Read-only Banner */}
+      {!planLoading && !canInvite && (
+        <div className={`mb-6 rounded-xl p-4 border ${
+          isReadOnly
+            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              {isReadOnly ? (
+                <>
+                  <p className="font-semibold text-sm text-orange-700 dark:text-orange-300">🔒 Ihr Plan ist abgelaufen</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
+                    Read-only Modus — bestehende Daten sind sicher archiviert.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-sm text-red-700 dark:text-red-300">🚫 Mitarbeiter-Limit erreicht</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">
+                    Ihr Plan erlaubt {limits.maxMembers} {limits.maxMembers === 1 ? 'Mitglied' : 'Mitglieder'}. Upgraden Sie für ein grösseres Team.
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => router.push('/pricing')}
+              className={`text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+                isReadOnly ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'
+              }`}>
+              {isReadOnly ? 'Plan erneuern →' : 'Plan upgraden →'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Success / Error */}
       {success && (
@@ -256,8 +316,8 @@ export default function MitarbeiterPage() {
             </div>
           ) : (
             <div className="flex gap-3">
-              <button onClick={handleGenerateInvite} disabled={isGenerating}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors">
+              <button onClick={handleGenerateInvite} disabled={isGenerating || !canInvite}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-colors">
                 {isGenerating ? 'Wird erstellt...' : '🔗 Link generieren'}
               </button>
               <button onClick={() => setShowInviteForm(false)}
