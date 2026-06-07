@@ -10,14 +10,12 @@ type UsePlanReturn = {
   isReadOnly: boolean;
   companyId: string;
   loading: boolean;
-  // Preverjanje limitov
   canCreateInvoice: boolean;
   canCreateExpense: boolean;
   canAddMember: boolean;
   canSendEmail: boolean;
   canExportSteuer: boolean;
   canExportCsv: boolean;
-  // Mesečne statistike
   invoicesThisMonth: number;
   expensesThisMonth: number;
   membersCount: number;
@@ -46,11 +44,9 @@ export function usePlan(): UsePlanReturn {
         if (!compSnap.exists()) return;
         const comp = compSnap.data();
 
-        // Plan
         const currentPlan: PlanType = comp.plan || 'free';
         setPlan(currentPlan);
 
-        // Read-only check — plan potekel
         if (comp.planExpiresAt) {
           const expiresAt = comp.planExpiresAt.toDate();
           if (expiresAt < new Date() && currentPlan !== 'free') {
@@ -59,7 +55,6 @@ export function usePlan(): UsePlanReturn {
           }
         }
 
-        // Mesečne statistike
         const now = new Date();
         const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -67,7 +62,8 @@ export function usePlan(): UsePlanReturn {
         const invoicesSnap = await getDocs(
           query(
             collection(db, 'companies', cId, 'invoices'),
-            where('dateKey', '==', monthKey)
+            where('dateKey', '>=', `${monthKey}-01`),
+            where('dateKey', '<=', `${monthKey}-31`)
           )
         );
         setInvoicesThisMonth(invoicesSnap.size);
