@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     }] : [];
 
     const { data, error } = await resend.emails.send({
-      from: 'FieldBill <onboarding@resend.dev>',
+      from: 'FieldBill <noreply@fieldbill.ch>',
       to,
       subject,
       html,
