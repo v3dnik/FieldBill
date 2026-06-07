@@ -4,12 +4,11 @@ import { useState, FormEvent, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { InvitationDoc } from '@/types/firestore';
 
-// ── Glavna forma (potrebuje useSearchParams) ──
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,7 +74,19 @@ function RegisterForm() {
       return;
     }
     try {
+      if (!invitation) {
+        // ── PREVERJANJE UNIKATNEGA IMENA FIRME ──
+        const nameQuery = query(collection(db, 'companies'), where('name', '==', companyName.trim()));
+        const nameSnap = await getDocs(nameQuery);
+        if (!nameSnap.empty) {
+          setError('Eine Firma mit diesem Namen ist bereits registriert. Falls Sie der Inhaber sind, kontaktieren Sie support@fieldbill.ch');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const firebaseUser = await signUp(email, password);
+
       if (invitation) {
         await setDoc(doc(db, 'users', firebaseUser.uid), {
           uid: firebaseUser.uid, email, firstName, lastName,
@@ -102,7 +113,7 @@ function RegisterForm() {
         });
         await setDoc(doc(db, 'companies', companyId), {
           companyId, ownerId: firebaseUser.uid,
-          name: companyName, phone: companyPhone,
+          name: companyName.trim(), phone: companyPhone,
           contactEmail: email,
           address: { street: '', zip: '', city: '', country: 'CH' },
           logoUrl: '', logoStoragePath: '',
@@ -143,8 +154,6 @@ function RegisterForm() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 p-6">
       <div className="w-full max-w-md">
-
-        {/* Logo + Title */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-5">
             <Image src="/fieldbill-logo.png" alt="FieldBill Logo" width={90} height={90}
@@ -274,7 +283,6 @@ function RegisterForm() {
   );
 }
 
-// ── Suspense wrapper — potreben za useSearchParams ──
 export default function RegisterPage() {
   return (
     <Suspense fallback={
