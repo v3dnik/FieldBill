@@ -368,8 +368,7 @@ export default function RechnungDetailPage() {
       const iban = company.bankDetails?.qrIban || company.bankDetails?.iban || '';
       if (iban) {
         try {
-          const { PDF } = await import('swissqrbill/pdf');
-          const { mm2pt } = await import('swissqrbill/utils');
+          const SwissQRBill = await import('swissqrbill');
 
           const qrData = {
             currency: 'CHF' as const,
@@ -379,7 +378,7 @@ export default function RechnungDetailPage() {
               address: company.address?.street || '',
               zip: company.address?.zip || '',
               city: company.address?.city || '',
-              country: (company.address?.country || 'CH') as any,
+              country: 'CH' as const,
               account: iban.replace(/\s/g, ''),
             },
             debtor: {
@@ -387,20 +386,17 @@ export default function RechnungDetailPage() {
               address: invoice.customerAddress?.street || '',
               zip: invoice.customerAddress?.zip || '',
               city: invoice.customerAddress?.city || '',
-              country: 'CH' as any,
+              country: 'CH' as const,
             },
-            reference: invoice.invoiceNumber.replace(/[^0-9]/g, '').padStart(27, '0'),
             message: invoice.invoiceNumber,
           };
 
-          const qrBill = new PDF(qrData, pdf as any);
-          qrBill.addPage();
+          await SwissQRBill.swissQRBill(qrData, pdf as any);
 
         } catch (qrErr) {
           console.warn('QR Bill konnte nicht generiert werden:', qrErr);
         }
       }
-
       // ── FOOTER ──
       const pages = pdf.getNumberOfPages();
       for (let i = 1; i <= pages; i++) {
