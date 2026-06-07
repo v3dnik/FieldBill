@@ -1,14 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { usePlan } from '@/hooks/usePlan';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
 export default function EinstellungenPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const {
+    plan, limits, isReadOnly, loading: planLoading,
+    invoicesThisMonth, expensesThisMonth, membersCount,
+  } = usePlan();
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -37,6 +44,44 @@ export default function EinstellungenPage() {
 
   const inputClass = "w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-blue-500";
 
+  // --- Plan-Anzeige Helfer ---
+  const planLabels: Record<string, string> = { free: 'Free', pro: 'Pro', business: 'Business' };
+  const planBadge: Record<string, string> = {
+    free: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    pro: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
+    business: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
+  };
+
+  const fmtLimit = (v: number | null) => (v === null ? 'Unbegrenzt' : String(v));
+
+  const UsageRow = ({ label, used, max }: { label: string; used: number; max: number | null }) => {
+    const isFull = max !== null && max > 0 && used >= max;
+    const notAvailable = max === 0;
+    return (
+      <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+        <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
+        {notAvailable ? (
+          <span className="text-sm font-medium text-gray-400 dark:text-gray-500">Nicht im Plan</span>
+        ) : (
+          <span className={`text-sm font-medium ${isFull ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+            {used} / {fmtLimit(max)}
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const FeatureRow = ({ label, enabled }: { label: string; enabled: boolean }) => (
+    <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+      <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
+      {enabled ? (
+        <span className="text-sm font-medium text-green-600 dark:text-green-400">Aktiviert</span>
+      ) : (
+        <span className="text-sm font-medium text-gray-400 dark:text-gray-500">Nicht im Plan</span>
+      )}
+    </div>
+  );
+
   return (
     <div className="max-w-xl mx-auto px-4 py-8 space-y-6">
       <div>
@@ -56,6 +101,53 @@ export default function EinstellungenPage() {
             <p className="text-gray-500 dark:text-gray-400 text-sm">Angemeldet</p>
           </div>
         </div>
+      </div>
+
+      {/* Abonnement / Plan */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Abonnement</h2>
+          {!planLoading && (
+            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${planBadge[plan]}`}>
+              {planLabels[plan] || plan}
+            </span>
+          )}
+        </div>
+
+        {planLoading ? (
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Wird geladen...</p>
+        ) : (
+          <>
+            {isReadOnly && (
+              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400 px-4 py-3 rounded-lg text-sm">
+                Ihr Abonnement ist abgelaufen. Sie wurden vorübergehend auf den Free-Plan zurückgestuft.
+              </div>
+            )}
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Nutzung (dieser Monat)</p>
+              <UsageRow label="Rechnungen / Monat" used={invoicesThisMonth} max={limits.invoicesPerMonth} />
+              <UsageRow label="Ausgaben / Monat" used={expensesThisMonth} max={limits.expensesPerMonth} />
+              <UsageRow label="Mitarbeiter" used={membersCount} max={limits.maxMembers} />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">Funktionen</p>
+              <FeatureRow label="E-Mail-Versand" enabled={limits.emailSending} />
+              <FeatureRow label="Steuerexport (PDF)" enabled={limits.steuerexport} />
+              <FeatureRow label="CSV-Export" enabled={limits.csvExport} />
+            </div>
+
+            {plan !== 'business' && (
+              <Link
+                href="/pricing"
+                className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors"
+              >
+                Jetzt upgraden
+              </Link>
+            )}
+          </>
+        )}
       </div>
 
       {/* Passwort */}

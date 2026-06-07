@@ -122,6 +122,8 @@ function RegisterForm() {
             numberTemplate: 'RE-{YYYY}-{NUM4}',
             nextNumber: 1, resetYearly: true,
           },
+          // ── PLAN: jede neue Firma startet im Free-Plan ──
+          plan: 'free',
           createdAt: serverTimestamp(),
         });
         await setDoc(doc(db, 'memberships', `${firebaseUser.uid}_${companyId}`), {
