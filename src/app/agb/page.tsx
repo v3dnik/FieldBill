@@ -25,7 +25,6 @@ export default function AgbPage() {
         </div>
 
         <div className="space-y-6 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-
           {[
             { title: '§ 1 Geltungsbereich und Vertragsparteien', content: [
               'Diese Allgemeinen Geschäftsbedingungen gelten für alle Verträge zwischen Vodnik Digital Solutions, Inhaber Tomaz Vodnik, Fischthürweg 37, 4802 Strengelbach (nachfolgend "Anbieter") und den Nutzern der Software FieldBill (nachfolgend "Kunde").',
@@ -40,6 +39,7 @@ export default function AgbPage() {
             ]},
             { title: '§ 3 Registrierung und Benutzerkonto', content: [
               'Zur Nutzung ist eine Registrierung mit gültiger E-Mail-Adresse erforderlich. Der Kunde garantiert die Richtigkeit seiner Angaben.',
+              'Pro E-Mail-Adresse ist nur ein Benutzerkonto zulässig. Pro Firmenname ist nur eine Registrierung möglich.',
               'Der Kunde ist für die Geheimhaltung seiner Zugangsdaten verantwortlich.',
               'Der Anbieter kann Konten bei Missbrauch oder AGB-Verstoss sperren.',
             ]},
@@ -49,43 +49,52 @@ export default function AgbPage() {
               'Abrechnung monatlich oder jährlich im Voraus über Stripe Inc.',
               'Preisänderungen werden 30 Tage im Voraus angekündigt. Bei Erhöhungen besteht ausserordentliches Kündigungsrecht.',
             ]},
-            { title: '§ 5 Kündigung', content: [
+            { title: '§ 5 Kündigung und Datenzugang nach Vertragsende', content: [
               'Free-Abonnements laufen auf unbestimmte Zeit.',
               'Kostenpflichtige Abonnements sind monatlich kündbar, bei Jahreszahlung zum Ende der Laufzeit.',
               'Kündigung per App-Einstellungen oder E-Mail an info@fieldbill.ch.',
-              'Nach Kündigung: 30 Tage Datenexport möglich, danach unwiderrufliche Löschung.',
+              'Nach Kündigung oder Ablauf des Abonnements wechselt das Konto automatisch in den Read-only-Modus. Der Kunde kann alle bestehenden Daten einsehen und exportieren, jedoch keine neuen Daten erfassen.',
+              'Der Anbieter ist gemäss OR Art. 958f verpflichtet, Geschäftsbücher und Belege 10 Jahre aufzubewahren. Sämtliche im System erfassten Rechnungen, Ausgaben und Belege werden daher mindestens 10 Jahre ab Erstellungsdatum gespeichert — unabhängig vom Abonnementstatus.',
+              'Der Kunde kann jederzeit, auch nach Kündigung, seine Daten per Export (PDF, CSV) herunterladen. Dieser Service ist kostenlos und bleibt während der gesamten 10-jährigen Aufbewahrungsfrist verfügbar.',
+              'Eine vollständige Löschung aller Kundendaten kann auf ausdrücklichen schriftlichen Wunsch beantragt werden, sofern keine gesetzlichen Aufbewahrungspflichten entgegenstehen.',
             ]},
-            { title: '§ 6 Verfügbarkeit und Datensicherung', content: [
+            { title: '§ 6 Gesetzliche Archivierungspflicht', content: [
+              'Gemäss Schweizer Obligationenrecht (OR Art. 958f) sind Unternehmen verpflichtet, Geschäftsbücher, Buchungsbelege und Geschäftskorrespondenz 10 Jahre aufzubewahren.',
+              'FieldBill erfüllt diese Pflicht stellvertretend für den Kunden durch sichere, redundante Datenspeicherung in der Cloud.',
+              'Im Falle einer behördlichen Prüfung durch das Finanzamt oder andere Behörden kann der Kunde jederzeit auf seine historischen Daten zugreifen — unabhängig vom aktuellen Abonnementstatus.',
+              'Der Anbieter stellt auf begründeten behördlichen Antrag oder auf Anfrage des Kunden eine vollständige Datenübersicht zur Verfügung.',
+            ]},
+            { title: '§ 7 Verfügbarkeit und Datensicherung', content: [
               'Angestrebte Verfügbarkeit: 99% im Jahresdurchschnitt. Kein Rechtsanspruch.',
-              'Regelmässige Datensicherungen. Kein Rechtsanspruch auf Datensicherung.',
+              'Regelmässige Datensicherungen auf mehreren redundanten Systemen. Kein Rechtsanspruch auf Datensicherung.',
               'Keine Haftung für Datenverluste durch höhere Gewalt oder Dritte.',
             ]},
-            { title: '§ 7 Pflichten des Kunden', content: [
+            { title: '§ 8 Pflichten des Kunden', content: [
               'Nutzung ausschliesslich für legale Zwecke.',
               'Verantwortung für Richtigkeit der eingegebenen Daten.',
               'Eigenverantwortung für steuerliche und buchhalterische Vorschriften.',
               'Reverse Engineering, Kopieren oder Weiterverkauf der Software ist untersagt.',
             ]},
-            { title: '§ 8 Haftungsbeschränkung', content: [
+            { title: '§ 9 Haftungsbeschränkung', content: [
               'Haftung nur bei Vorsatz oder grober Fahrlässigkeit.',
               'Keine Haftung für indirekte Schäden, Folgeschäden oder entgangenen Gewinn.',
               'Maximale Haftung: Betrag der in den letzten 12 Monaten bezahlten Abonnementgebühren.',
               'Keine Gewähr für steuerliche Konformität der erstellten Dokumente.',
             ]},
-            { title: '§ 9 Geistiges Eigentum', content: [
+            { title: '§ 10 Geistiges Eigentum', content: [
               'Alle Rechte an FieldBill verbleiben beim Anbieter.',
               'Dem Kunden wird ein nicht-exklusives Nutzungsrecht für die Abonnementdauer eingeräumt.',
               'Vom Kunden eingegebene Daten bleiben Eigentum des Kunden.',
             ]},
-            { title: '§ 10 Änderungen der AGB', content: [
+            { title: '§ 11 Änderungen der AGB', content: [
               'AGB-Änderungen werden per E-Mail angekündigt.',
               'Kein Widerspruch innerhalb von 30 Tagen gilt als Zustimmung.',
             ]},
-            { title: '§ 11 Anwendbares Recht und Gerichtsstand', content: [
+            { title: '§ 12 Anwendbares Recht und Gerichtsstand', content: [
               'Es gilt Schweizer Recht, unter Ausschluss von Kollisionsnormen und UN-Kaufrecht.',
               'Gerichtsstand: Aarau, Kanton Aargau, Schweiz.',
             ]},
-            { title: '§ 12 Schlussbestimmungen', content: [
+            { title: '§ 13 Schlussbestimmungen', content: [
               'Unwirksame Bestimmungen berühren die übrigen nicht.',
               'Kontakt: info@fieldbill.ch · Vodnik Digital Solutions · Fischthürweg 37, 4802 Strengelbach',
             ]},
