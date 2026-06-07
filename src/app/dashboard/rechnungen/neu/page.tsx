@@ -6,6 +6,7 @@ import { collection, doc, getDoc, getDocs, addDoc, updateDoc, Timestamp } from '
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth-context';
 import { ItemDoc, CompanyDoc, KundeDoc } from '@/types/firestore';
+import { usePlan } from '@/hooks/usePlan';
 import { Suspense } from 'react';
 
 const ZAHLUNGSMETHODEN = [
@@ -55,6 +56,17 @@ function NeuRechnungInner() {
   const searchParams = useSearchParams();
   const kundeIdParam = searchParams.get('kundeId');
 
+  // ── PLAN LIMITI ──
+  const {
+    canCreateInvoice,
+    canSendEmail,
+    invoicesThisMonth,
+    limits,
+    isReadOnly,
+    plan,
+    loading: planLoading,
+  } = usePlan();
+
   const [companyId, setCompanyId] = useState('');
   const [company, setCompany] = useState<CompanyDoc | null>(null);
   const [katalog, setKatalog] = useState<ItemDoc[]>([]);
@@ -62,12 +74,10 @@ function NeuRechnungInner() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Kunden Suche
   const [kundeSearch, setKundeSearch] = useState('');
   const [showKundeDropdown, setShowKundeDropdown] = useState(false);
   const [selectedKunde, setSelectedKunde] = useState<KundeDoc | null>(null);
 
-  // Kunde Felder
   const [customerName, setCustomerName] = useState('');
   const [customerStreet, setCustomerStreet] = useState('');
   const [customerZip, setCustomerZip] = useState('');
@@ -82,11 +92,8 @@ function NeuRechnungInner() {
   const [zahlungsfrist, setZahlungsfrist] = useState(30);
   const [notes, setNotes] = useState('');
   const [issueDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Bereits bezahlt
   const [bereitsBezahlt, setBereitsBezahlt] = useState(false);
 
-  // Pametna logika — Bar/TWINT/Karte → avtomatsko bezahlt
   useEffect(() => {
     if (zahlungsmethode === 'bar' || zahlungsmethode === 'twint' || zahlungsmethode === 'karte') {
       setBereitsBezahlt(true);
@@ -148,7 +155,6 @@ function NeuRechnungInner() {
     return name.includes(s) || email.includes(s);
   });
 
-  // MwSt berechnen
   const subtotalRappen = positionen.reduce((sum, p) => sum + p.quantity * p.unitPriceRappen, 0);
   const vatEnabled = company?.vatEnabled ?? false;
   const vatRate = vatEnabled ? (company?.vatRate || 0.081) : 0;
@@ -172,18 +178,13 @@ function NeuRechnungInner() {
     setPositionen(updated);
   };
 
-  // PDF als Base64 generieren
-  const generatePDFBase64 = async (
-    invoiceNumber: string,
-    isQuittung: boolean
-  ): Promise<string> => {
+  const generatePDFBase64 = async (invoiceNumber: string, isQuittung: boolean): Promise<string> => {
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const now = new Date().toLocaleDateString('de-CH');
 
-    // Header
     pdf.setFillColor(26, 86, 219);
     pdf.rect(0, 0, pageWidth, 38, 'F');
     pdf.setTextColor(255, 255, 255);
@@ -195,7 +196,6 @@ function NeuRechnungInner() {
     if (company?.phone) pdf.text(company.phone, 14, 31);
     if (company?.contactEmail) pdf.text(company.contactEmail, 14, 36);
 
-    // Rechnung / Quittung info rechts
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
     pdf.text(isQuittung ? 'QUITTUNG' : 'RECHNUNG', pageWidth - 14, 14, { align: 'right' });
     pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
@@ -205,7 +205,6 @@ function NeuRechnungInner() {
       pdf.text(`Zahlungsart: ${ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label || zahlungsmethode}`, pageWidth - 14, 33, { align: 'right' });
     }
 
-    // Status Badge
     if (isQuittung) {
       pdf.setFillColor(22, 163, 74);
       pdf.roundedRect(14, 42, 30, 8, 2, 2, 'F');
@@ -214,9 +213,8 @@ function NeuRechnungInner() {
       pdf.text('BEZAHLT', 29, 47.5, { align: 'center' });
     }
 
-    // Empfänger
     pdf.setTextColor(107, 114, 128); pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
-    pdf.text('RECHNUNGSEMPFÄNGER', 14, 58);
+    pdf.text('RECHNUNGSEMPFAENGER', 14, 58);
     pdf.setTextColor(17, 24, 39); pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
     pdf.text(customerName, 14, 65);
     pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
@@ -224,11 +222,9 @@ function NeuRechnungInner() {
     if (customerZip) pdf.text(`${customerZip} ${customerCity}`, 14, 76);
     if (customerEmail) { pdf.setTextColor(107, 114, 128); pdf.text(customerEmail, 14, 82); }
 
-    // Positionen
     const tableBody = positionen.map(p => [
       p.name + (p.description ? `\n${p.description}` : ''),
-      p.quantity.toString(),
-      p.unit,
+      p.quantity.toString(), p.unit,
       formatCHF(p.unitPriceRappen),
       formatCHF(p.quantity * p.unitPriceRappen),
     ]);
@@ -236,23 +232,18 @@ function NeuRechnungInner() {
     autoTable(pdf, {
       startY: 90,
       head: [['Bezeichnung', 'Menge', 'Einheit', 'Preis', 'Total']],
-      body: tableBody,
-      theme: 'grid',
+      body: tableBody, theme: 'grid',
       headStyles: { fillColor: [26, 86, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       bodyStyles: { fontSize: 9, textColor: [55, 65, 81] },
       columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { halign: 'right', cellWidth: 20 },
-        2: { halign: 'center', cellWidth: 20 },
-        3: { halign: 'right', cellWidth: 28 },
+        0: { cellWidth: 'auto' }, 1: { halign: 'right', cellWidth: 20 },
+        2: { halign: 'center', cellWidth: 20 }, 3: { halign: 'right', cellWidth: 28 },
         4: { halign: 'right', cellWidth: 28, fontStyle: 'bold' },
       },
       alternateRowStyles: { fillColor: [249, 250, 251] },
     });
 
     let y = (pdf as any).lastAutoTable.finalY + 6;
-
-    // Totals
     const totalsX = pageWidth - 80;
     pdf.setFontSize(9); pdf.setTextColor(107, 114, 128); pdf.setFont('helvetica', 'normal');
     pdf.text('Subtotal:', totalsX, y);
@@ -274,7 +265,6 @@ function NeuRechnungInner() {
 
     pdf.setDrawColor(26, 86, 219); pdf.setLineWidth(0.5);
     pdf.line(totalsX, y, pageWidth - 14, y); y += 5;
-
     pdf.setFillColor(26, 86, 219);
     pdf.roundedRect(totalsX - 4, y - 4, 80, 12, 2, 2, 'F');
     pdf.setTextColor(255, 255, 255);
@@ -283,7 +273,6 @@ function NeuRechnungInner() {
     pdf.text(formatCHF(totalRappen), pageWidth - 14, y + 4, { align: 'right' });
     y += 18;
 
-    // Zahlungsinfos (nur bei Rechnung)
     if (!isQuittung && company?.bankDetails?.iban) {
       pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(17, 24, 39);
       pdf.text('Zahlungsinformationen', 14, y); y += 5;
@@ -292,13 +281,11 @@ function NeuRechnungInner() {
       if (company.bankDetails.bankName) pdf.text(`Bank: ${company.bankDetails.bankName}`, 14, y);
     }
 
-    // Quittung Hinweis
     if (isQuittung) {
       pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(22, 163, 74);
       pdf.text(`Zahlung erhalten am ${now} via ${ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label || zahlungsmethode}`, 14, y);
     }
 
-    // Footer
     const pages = pdf.getNumberOfPages();
     for (let i = 1; i <= pages; i++) {
       pdf.setPage(i);
@@ -311,18 +298,11 @@ function NeuRechnungInner() {
     return pdf.output('datauristring').split(',')[1];
   };
 
-  // Email senden
-  const sendEmail = async (
-    toEmail: string,
-    invoiceNumber: string,
-    isQuittung: boolean,
-    pdfBase64: string
-  ) => {
+  const sendEmail = async (toEmail: string, invoiceNumber: string, isQuittung: boolean, pdfBase64: string) => {
     const zahlungsart = ZAHLUNGSMETHODEN.find(z => z.value === zahlungsmethode)?.label || zahlungsmethode;
     const now = new Date().toLocaleDateString('de-CH');
-
     const subject = isQuittung
-      ? `Zahlungsbestätigung ${invoiceNumber} ✓ — ${company?.name}`
+      ? `Zahlungsbestaetigung ${invoiceNumber} ✓ — ${company?.name}`
       : `Rechnung ${invoiceNumber} — ${company?.name}`;
 
     const html = isQuittung ? `
@@ -332,11 +312,11 @@ function NeuRechnungInner() {
           <p style="color: #93c5fd; margin: 4px 0 0 0; font-size: 14px;">${company?.name}</p>
         </div>
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px;">
-          <p style="color: #16a34a; font-size: 18px; font-weight: bold; margin: 0;">✓ Zahlung bestätigt</p>
+          <p style="color: #16a34a; font-size: 18px; font-weight: bold; margin: 0;">✓ Zahlung bestaetigt</p>
         </div>
         <div style="background: #ffffff; border: 1px solid #e5e7eb; padding: 24px;">
           <p style="color: #374151;">Sehr geehrte Damen und Herren</p>
-          <p style="color: #374151;">Wir bestätigen den Eingang Ihrer Zahlung:</p>
+          <p style="color: #374151;">Wir bestaetigen den Eingang Ihrer Zahlung:</p>
           <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
             <tr style="border-bottom: 1px solid #e5e7eb;">
               <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Dokument-Nr.</td>
@@ -356,7 +336,7 @@ function NeuRechnungInner() {
             </tr>
           </table>
           <p style="color: #374151;">Die Quittung finden Sie im Anhang.</p>
-          <p style="color: #374151; margin-top: 24px;">Mit freundlichen Grüssen<br><strong>${company?.name}</strong></p>
+          <p style="color: #374151; margin-top: 24px;">Mit freundlichen Gruessen<br><strong>${company?.name}</strong></p>
         </div>
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; padding: 16px; border-radius: 0 0 12px 12px; text-align: center;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">FieldBill — Entwickelt von Vodnik Digital Solutions — vodnik.ch</p>
@@ -396,7 +376,7 @@ function NeuRechnungInner() {
             ${company.bankDetails.bankName ? `<p style="color: #374151; font-size: 14px; margin: 4px 0;">Bank: ${company.bankDetails.bankName}</p>` : ''}
           </div>
           ` : ''}
-          <p style="color: #374151; margin-top: 24px;">Mit freundlichen Grüssen<br><strong>${company?.name}</strong></p>
+          <p style="color: #374151; margin-top: 24px;">Mit freundlichen Gruessen<br><strong>${company?.name}</strong></p>
         </div>
         <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; padding: 16px; border-radius: 0 0 12px 12px; text-align: center;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">FieldBill — Entwickelt von Vodnik Digital Solutions — vodnik.ch</p>
@@ -408,16 +388,17 @@ function NeuRechnungInner() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: toEmail,
-        subject,
-        html,
-        pdfBase64,
+        to: toEmail, subject, html, pdfBase64,
         pdfFilename: isQuittung ? `Quittung_${invoiceNumber}.pdf` : `Rechnung_${invoiceNumber}.pdf`,
       }),
     });
   };
 
   const handleSave = async () => {
+    if (!canCreateInvoice) {
+      setError(`Sie haben das Limit von ${limits.invoicesPerMonth} Rechnungen pro Monat erreicht. Bitte upgraden Sie Ihren Plan.`);
+      return;
+    }
     if (!customerName.trim()) { setError('Kundenname ist erforderlich.'); return; }
     if (positionen.some(p => !p.name.trim())) { setError('Alle Positionen müssen einen Namen haben.'); return; }
     if (positionen.some(p => p.quantity <= 0)) { setError('Alle Mengen müssen grösser als 0 sein.'); return; }
@@ -432,13 +413,10 @@ function NeuRechnungInner() {
       const issueDateObj = new Date(issueDate);
       const dueDateObj = new Date(issueDateObj);
       dueDateObj.setDate(dueDateObj.getDate() + zahlungsfrist);
-
-      // Status: bezahlt ali ausgestellt
       const status = bereitsBezahlt ? 'paid' : 'issued';
 
       await addDoc(collection(db, 'companies', companyId, 'invoices'), {
-        invoiceNumber,
-        status,
+        invoiceNumber, status,
         createdBy: user!.uid,
         dateKey: issueDate,
         issueDate: Timestamp.fromDate(issueDateObj),
@@ -455,16 +433,15 @@ function NeuRechnungInner() {
         })),
         subtotalRappen, vatRate, vatRappen, totalRappen,
         paymentMethod: zahlungsmethode,
-        zahlungsfrist,
-        notes: notes.trim(),
+        zahlungsfrist, notes: notes.trim(),
         ...(bereitsBezahlt && { paidAt: Timestamp.now() }),
         createdAt: Timestamp.now(),
       });
 
       await updateDoc(compRef, { 'invoiceSettings.nextNumber': nextNum + 1 });
 
-      // Email senden če ima stranka email
-      if (customerEmail.trim()) {
+      // Email nur wenn plan erlaubt
+      if (customerEmail.trim() && canSendEmail) {
         const pdfBase64 = await generatePDFBase64(invoiceNumber, bereitsBezahlt);
         await sendEmail(customerEmail.trim(), invoiceNumber, bereitsBezahlt, pdfBase64);
       }
@@ -475,6 +452,17 @@ function NeuRechnungInner() {
       setSaving(false);
     }
   };
+
+  // ── PLAN LIMIT BANNER ──
+  const limitReached = !canCreateInvoice;
+  const limitWarning = !limitReached && limits.invoicesPerMonth !== null &&
+    invoicesThisMonth >= limits.invoicesPerMonth - 1;
+
+  if (planLoading) return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-gray-400">Wird geladen...</div>
+    </div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -494,6 +482,49 @@ function NeuRechnungInner() {
           ✕ Abbrechen
         </button>
       </div>
+
+      {/* Plan Limit erreicht */}
+      {limitReached && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-5">
+          <p className="text-red-700 dark:text-red-300 font-semibold text-sm">
+            🚫 Monatliches Limit erreicht
+          </p>
+          <p className="text-red-600 dark:text-red-400 text-sm mt-1">
+            Sie haben diesen Monat bereits {invoicesThisMonth} von {limits.invoicesPerMonth} Rechnungen erstellt.
+            Upgraden Sie auf Pro oder Business für mehr Rechnungen.
+          </p>
+          <button onClick={() => router.push('/pricing')}
+            className="mt-3 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            Plan upgraden →
+          </button>
+        </div>
+      )}
+
+      {/* Plan Limit Warnung */}
+      {limitWarning && !limitReached && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-4">
+          <p className="text-yellow-700 dark:text-yellow-300 text-sm">
+            ⚠️ Sie haben noch <strong>1 Rechnung</strong> übrig diesen Monat ({invoicesThisMonth}/{limits.invoicesPerMonth}).
+            <button onClick={() => router.push('/pricing')} className="ml-2 underline">Plan upgraden</button>
+          </p>
+        </div>
+      )}
+
+      {/* Read-only Banner */}
+      {isReadOnly && (
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-xl p-5">
+          <p className="text-orange-700 dark:text-orange-300 font-semibold text-sm">
+            🔒 Ihr Plan ist abgelaufen
+          </p>
+          <p className="text-orange-600 dark:text-orange-400 text-sm mt-1">
+            Sie befinden sich im Read-only Modus. Bestehende Daten sind sicher archiviert.
+          </p>
+          <button onClick={() => router.push('/pricing')}
+            className="mt-3 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            Plan erneuern →
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
@@ -545,34 +576,34 @@ function NeuRechnungInner() {
           <div>
             <label className={labelClass}>Name / Firma <span className="text-red-500">*</span></label>
             <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
-              placeholder="z.B. Max Mustermann AG" className={inputClass} />
+              placeholder="z.B. Max Mustermann AG" className={inputClass} disabled={isReadOnly || limitReached} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-3">
               <label className={labelClass}>Strasse</label>
               <input type="text" value={customerStreet} onChange={e => setCustomerStreet(e.target.value)}
-                placeholder="Musterstrasse 1" className={inputClass} />
+                placeholder="Musterstrasse 1" className={inputClass} disabled={isReadOnly || limitReached} />
             </div>
             <div>
               <label className={labelClass}>PLZ</label>
               <input type="text" value={customerZip} onChange={e => setCustomerZip(e.target.value)}
-                placeholder="8001" className={inputClass} />
+                placeholder="8001" className={inputClass} disabled={isReadOnly || limitReached} />
             </div>
             <div className="col-span-2">
               <label className={labelClass}>Ort</label>
               <input type="text" value={customerCity} onChange={e => setCustomerCity(e.target.value)}
-                placeholder="Zürich" className={inputClass} />
+                placeholder="Zürich" className={inputClass} disabled={isReadOnly || limitReached} />
             </div>
           </div>
           <div>
             <label className={labelClass}>
               E-Mail
               <span className="text-gray-400 text-xs ml-1">
-                {customerEmail ? '— wird automatisch per E-Mail zugestellt' : '(optional)'}
+                {customerEmail && canSendEmail ? '— wird automatisch per E-Mail zugestellt' : customerEmail && !canSendEmail ? '— E-Mail Versand nicht im Free Plan' : '(optional)'}
               </span>
             </label>
             <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-              placeholder="kunde@beispiel.ch" className={inputClass} />
+              placeholder="kunde@beispiel.ch" className={inputClass} disabled={isReadOnly || limitReached} />
           </div>
         </div>
       </div>
@@ -592,7 +623,7 @@ function NeuRechnungInner() {
               {katalog.length > 0 && (
                 <div>
                   <label className={labelSmClass}>Aus Leistungskatalog wählen</label>
-                  <select onChange={e => selectFromKatalog(idx, e.target.value)} defaultValue="" className={inputSmClass}>
+                  <select onChange={e => selectFromKatalog(idx, e.target.value)} defaultValue="" className={inputSmClass} disabled={isReadOnly || limitReached}>
                     <option value="">— Leistung auswählen —</option>
                     {katalog.map(item => (
                       <option key={item.itemId} value={item.itemId}>{item.name} — {formatCHF(item.priceRappen)} / {item.unit}</option>
@@ -603,30 +634,30 @@ function NeuRechnungInner() {
               <div>
                 <label className={labelSmClass}>Bezeichnung <span className="text-red-500">*</span></label>
                 <input type="text" value={pos.name} onChange={e => updatePosition(idx, 'name', e.target.value)}
-                  placeholder="z.B. Umzug pro Stunde" className={inputSmClass} />
+                  placeholder="z.B. Umzug pro Stunde" className={inputSmClass} disabled={isReadOnly || limitReached} />
               </div>
               <div>
                 <label className={labelSmClass}>Beschreibung</label>
                 <input type="text" value={pos.description} onChange={e => updatePosition(idx, 'description', e.target.value)}
-                  placeholder="Zusätzliche Details (optional)" className={inputSmClass} />
+                  placeholder="Zusätzliche Details (optional)" className={inputSmClass} disabled={isReadOnly || limitReached} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className={labelSmClass}>Menge</label>
                   <input type="number" value={pos.quantity}
                     onChange={e => updatePosition(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                    min="0.1" step="0.5" className={inputSmClass} />
+                    min="0.1" step="0.5" className={inputSmClass} disabled={isReadOnly || limitReached} />
                 </div>
                 <div>
                   <label className={labelSmClass}>Einheit</label>
                   <input type="text" value={pos.unit} onChange={e => updatePosition(idx, 'unit', e.target.value)}
-                    placeholder="Stunde" className={inputSmClass} />
+                    placeholder="Stunde" className={inputSmClass} disabled={isReadOnly || limitReached} />
                 </div>
                 <div>
                   <label className={labelSmClass}>Preis/Einheit (CHF)</label>
                   <input type="number" value={pos.unitPriceRappen / 100}
                     onChange={e => updatePosition(idx, 'unitPriceRappen', Math.round((parseFloat(e.target.value) || 0) * 100))}
-                    min="0" step="0.05" placeholder="0.00" className={inputSmClass} />
+                    min="0" step="0.05" placeholder="0.00" className={inputSmClass} disabled={isReadOnly || limitReached} />
                 </div>
               </div>
               <div className="text-right text-sm text-gray-500 dark:text-gray-400">
@@ -634,10 +665,12 @@ function NeuRechnungInner() {
               </div>
             </div>
           ))}
-          <button onClick={addPosition}
-            className="w-full border border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 text-gray-400 hover:text-blue-500 py-3 rounded-xl transition-colors text-sm">
-            + Position hinzufügen
-          </button>
+          {!isReadOnly && !limitReached && (
+            <button onClick={addPosition}
+              className="w-full border border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 text-gray-400 hover:text-blue-500 py-3 rounded-xl transition-colors text-sm">
+              + Position hinzufügen
+            </button>
+          )}
         </div>
       </div>
 
@@ -670,21 +703,20 @@ function NeuRechnungInner() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Zahlungsmethode</label>
-              <select value={zahlungsmethode} onChange={e => setZahlungsmethode(e.target.value)} className={inputClass}>
+              <select value={zahlungsmethode} onChange={e => setZahlungsmethode(e.target.value)} className={inputClass} disabled={isReadOnly || limitReached}>
                 {ZAHLUNGSMETHODEN.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
               </select>
             </div>
             {!bereitsBezahlt && (
               <div>
                 <label className={labelClass}>Zahlungsfrist</label>
-                <select value={zahlungsfrist} onChange={e => setZahlungsfrist(parseInt(e.target.value))} className={inputClass}>
+                <select value={zahlungsfrist} onChange={e => setZahlungsfrist(parseInt(e.target.value))} className={inputClass} disabled={isReadOnly || limitReached}>
                   {ZAHLUNGSFRISTEN.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
                 </select>
               </div>
             )}
           </div>
 
-          {/* Bereits bezahlt Toggle */}
           <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-colors ${
             bereitsBezahlt
               ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600'
@@ -703,6 +735,7 @@ function NeuRechnungInner() {
             <button
               type="button"
               onClick={() => setBereitsBezahlt(!bereitsBezahlt)}
+              disabled={isReadOnly || limitReached}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 bereitsBezahlt ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
               }`}>
@@ -716,13 +749,13 @@ function NeuRechnungInner() {
             <label className={labelClass}>Bemerkungen <span className="text-gray-400 text-xs">(optional)</span></label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
               placeholder="z.B. Vielen Dank für Ihren Auftrag."
-              rows={3} className={`${inputClass} resize-none`} />
+              rows={3} className={`${inputClass} resize-none`} disabled={isReadOnly || limitReached} />
           </div>
         </div>
       </div>
 
       {/* Email Info */}
-      {customerEmail && (
+      {customerEmail && canSendEmail && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
           <p className="text-blue-700 dark:text-blue-300 text-sm font-medium">
             📧 {bereitsBezahlt ? 'Quittung' : 'Rechnung'} wird automatisch an {customerEmail} gesendet
@@ -730,22 +763,31 @@ function NeuRechnungInner() {
         </div>
       )}
 
+      {customerEmail && !canSendEmail && (
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            📧 E-Mail Versand ist im Free Plan nicht verfügbar.
+            <button onClick={() => router.push('/pricing')} className="ml-1 text-blue-600 dark:text-blue-400 underline">Upgraden →</button>
+          </p>
+        </div>
+      )}
+
       {/* Button */}
-      <div className="pb-8">
-        <button onClick={handleSave} disabled={saving}
-          className={`w-full disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors text-base ${
-            bereitsBezahlt
-              ? 'bg-green-600 hover:bg-green-700'
-              : 'bg-blue-600 hover:bg-blue-700'
-          }`}>
-          {saving
-            ? (customerEmail ? 'Wird gespeichert und gesendet...' : 'Wird gespeichert...')
-            : bereitsBezahlt
-              ? `✓ Quittung ausstellen${customerEmail ? ' & per E-Mail senden' : ''}`
-              : `Rechnung ausstellen${customerEmail ? ' & per E-Mail senden' : ''}`
-          }
-        </button>
-      </div>
+      {!isReadOnly && !limitReached && (
+        <div className="pb-8">
+          <button onClick={handleSave} disabled={saving}
+            className={`w-full disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors text-base ${
+              bereitsBezahlt ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+            }`}>
+            {saving
+              ? (customerEmail && canSendEmail ? 'Wird gespeichert und gesendet...' : 'Wird gespeichert...')
+              : bereitsBezahlt
+                ? `✓ Quittung ausstellen${customerEmail && canSendEmail ? ' & per E-Mail senden' : ''}`
+                : `Rechnung ausstellen${customerEmail && canSendEmail ? ' & per E-Mail senden' : ''}`
+            }
+          </button>
+        </div>
+      )}
     </div>
   );
 }
