@@ -34,6 +34,7 @@ export type PlanLimits = {
   invoicesPerMonth: number | null;  // null = neomejeno
   expensesPerMonth: number | null;  // null = neomejeno
   maxMembers: number;
+  maxKunden: number | null;         // null = neomejeno
   emailSending: boolean;
   steuerexport: boolean;
   csvExport: boolean;
@@ -44,8 +45,9 @@ export type PlanLimits = {
 export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
   free: {
     invoicesPerMonth: 3,
-    expensesPerMonth: 0,
+    expensesPerMonth: 3,
     maxMembers: 1,
+    maxKunden: 3,
     emailSending: false,
     steuerexport: false,
     csvExport: false,
@@ -56,6 +58,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     invoicesPerMonth: 50,
     expensesPerMonth: 50,
     maxMembers: 3,
+    maxKunden: null,
     emailSending: true,
     steuerexport: false,
     csvExport: false,
@@ -66,6 +69,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanLimits> = {
     invoicesPerMonth: null,
     expensesPerMonth: null,
     maxMembers: 50,
+    maxKunden: null,
     emailSending: true,
     steuerexport: true,
     csvExport: true,

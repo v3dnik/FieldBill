@@ -13,12 +13,14 @@ type UsePlanReturn = {
   canCreateInvoice: boolean;
   canCreateExpense: boolean;
   canAddMember: boolean;
+  canAddKunde: boolean;
   canSendEmail: boolean;
   canExportSteuer: boolean;
   canExportCsv: boolean;
   invoicesThisMonth: number;
   expensesThisMonth: number;
   membersCount: number;
+  kundenCount: number;
 };
 
 export function usePlan(): UsePlanReturn {
@@ -30,6 +32,7 @@ export function usePlan(): UsePlanReturn {
   const [invoicesThisMonth, setInvoicesThisMonth] = useState(0);
   const [expensesThisMonth, setExpensesThisMonth] = useState(0);
   const [membersCount, setMembersCount] = useState(0);
+  const [kundenCount, setKundenCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -86,6 +89,10 @@ export function usePlan(): UsePlanReturn {
         }).length;
         setMembersCount(memberCount);
 
+        // Kunden (skupno število v imeniku)
+        const kundenSnap = await getDocs(collection(db, 'companies', cId, 'kunden'));
+        setKundenCount(kundenSnap.size);
+
       } catch (err) {
         console.error('usePlan error:', err);
       } finally {
@@ -104,14 +111,18 @@ export function usePlan(): UsePlanReturn {
     (limits.expensesPerMonth === null || (limits.expensesPerMonth > 0 && expensesThisMonth < limits.expensesPerMonth));
 
   const canAddMember = !isReadOnly && membersCount < limits.maxMembers;
+
+  const canAddKunde = !isReadOnly &&
+    (limits.maxKunden === null || kundenCount < limits.maxKunden);
+
   const canSendEmail = !isReadOnly && limits.emailSending;
   const canExportSteuer = !isReadOnly && limits.steuerexport;
   const canExportCsv = !isReadOnly && limits.csvExport;
 
   return {
     plan, limits, isReadOnly, companyId, loading,
-    canCreateInvoice, canCreateExpense, canAddMember,
+    canCreateInvoice, canCreateExpense, canAddMember, canAddKunde,
     canSendEmail, canExportSteuer, canExportCsv,
-    invoicesThisMonth, expensesThisMonth, membersCount,
+    invoicesThisMonth, expensesThisMonth, membersCount, kundenCount,
   };
 }
