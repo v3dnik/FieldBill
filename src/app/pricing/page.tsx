@@ -40,10 +40,10 @@ const PLANS = [
       { text: 'PDF Export', included: true },
       { text: 'Bilanz Übersicht', included: true },
       { text: 'Logo auf Rechnungen', included: true },
-      { text: 'CSV Export', included: true },
-      { text: 'E-Mail Versand', included: true },
       { text: 'Kein Wasserzeichen', included: true },
+      { text: 'E-Mail Versand', included: false },
       { text: 'Steuerexport PDF', included: false },
+      { text: 'CSV Export', included: false },
     ],
   },
   {
