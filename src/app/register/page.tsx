@@ -203,13 +203,13 @@ function RegisterForm() {
                 <label className={labelClass}>Vorname</label>
                 <input type="text" required value={firstName}
                   onChange={e => setFirstName(e.target.value)}
-                  className={inputClass} disabled={isLoading} />
+                  className={inputClass} placeholder="Vorname" disabled={isLoading} />
               </div>
               <div>
                 <label className={labelClass}>Nachname</label>
                 <input type="text" required value={lastName}
                   onChange={e => setLastName(e.target.value)}
-                  className={inputClass} disabled={isLoading} />
+                  className={inputClass} placeholder="Nachname" disabled={isLoading} />
               </div>
             </div>
 
@@ -217,7 +217,7 @@ function RegisterForm() {
               <label className={labelClass}>E-Mail</label>
               <input type="email" required value={email}
                 onChange={e => setEmail(e.target.value)}
-                className={inputClass} placeholder="name@firma.ch"
+                className={inputClass} placeholder="E-Mail"
                 disabled={isLoading} />
             </div>
 
@@ -240,14 +240,14 @@ function RegisterForm() {
                   <label className={labelClass}>Firmenname</label>
                   <input type="text" required value={companyName}
                     onChange={e => setCompanyName(e.target.value)}
-                    className={inputClass} placeholder="z.B. Müller Umzüge GmbH"
+                    className={inputClass} placeholder="Firmenname"
                     disabled={isLoading} />
                 </div>
                 <div>
                   <label className={labelClass}>Telefon</label>
                   <input type="tel" required value={companyPhone}
                     onChange={e => setCompanyPhone(e.target.value)}
-                    className={inputClass} placeholder="+41 79 123 45 67"
+                    className={inputClass} placeholder="Telefon"
                     disabled={isLoading} />
                 </div>
               </>

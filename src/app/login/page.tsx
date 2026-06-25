@@ -97,7 +97,7 @@ export default function LoginPage() {
                 id="email" type="email" required
                 value={email} onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="name@firma.ch"
+                placeholder="E-Mail"
                 disabled={isLoading}
               />
             </div>
@@ -180,7 +180,7 @@ export default function LoginPage() {
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition-colors"
-                    placeholder="name@firma.ch"
+                    placeholder="E-Mail"
                   />
                 </div>
 
