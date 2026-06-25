@@ -186,17 +186,17 @@ export default function NeuKundePage() {
             <div>
               <label className={labelClass}>Firmenname <span className="text-red-500">*</span></label>
               <input type="text" value={firmenname} onChange={e => setFirmenname(e.target.value)}
-                placeholder="z.B. Müller Transport AG" className={inputClass} disabled={!canAddKunde} />
+                placeholder="Firmenname" className={inputClass} disabled={!canAddKunde} />
             </div>
             <div>
               <label className={labelClass}>Ansprechpartner <span className="text-gray-400 text-xs">(optional)</span></label>
               <input type="text" value={ansprechpartner} onChange={e => setAnsprechpartner(e.target.value)}
-                placeholder="z.B. Hans Müller" className={inputClass} disabled={!canAddKunde} />
+                placeholder="Ansprechpartner" className={inputClass} disabled={!canAddKunde} />
             </div>
             <div>
               <label className={labelClass}>UID / MwSt-Nr <span className="text-gray-400 text-xs">(optional)</span></label>
               <input type="text" value={uid} onChange={e => setUid(e.target.value)}
-                placeholder="CHE-123.456.789 MWST" className={`${inputClass} font-mono`} disabled={!canAddKunde} />
+                placeholder="UID / MwSt-Nr" className={`${inputClass} font-mono`} disabled={!canAddKunde} />
             </div>
           </>
         ) : (
@@ -204,12 +204,12 @@ export default function NeuKundePage() {
             <div>
               <label className={labelClass}>Vorname</label>
               <input type="text" value={vorname} onChange={e => setVorname(e.target.value)}
-                placeholder="Hans" className={inputClass} disabled={!canAddKunde} />
+                placeholder="Vorname" className={inputClass} disabled={!canAddKunde} />
             </div>
             <div>
               <label className={labelClass}>Nachname <span className="text-red-500">*</span></label>
               <input type="text" value={nachname} onChange={e => setNachname(e.target.value)}
-                placeholder="Müller" className={inputClass} disabled={!canAddKunde} />
+                placeholder="Nachname" className={inputClass} disabled={!canAddKunde} />
             </div>
           </div>
         )}
@@ -221,12 +221,12 @@ export default function NeuKundePage() {
         <div>
           <label className={labelClass}>E-Mail</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="kunde@beispiel.ch" className={inputClass} disabled={!canAddKunde} />
+            placeholder="E-Mail" className={inputClass} disabled={!canAddKunde} />
         </div>
         <div>
           <label className={labelClass}>Telefon</label>
           <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-            placeholder="+41 79 123 45 67" className={inputClass} disabled={!canAddKunde} />
+            placeholder="Telefon" className={inputClass} disabled={!canAddKunde} />
         </div>
       </div>
 
@@ -236,18 +236,18 @@ export default function NeuKundePage() {
         <div>
           <label className={labelClass}>Strasse</label>
           <input type="text" value={street} onChange={e => setStreet(e.target.value)}
-            placeholder="Bahnhofstrasse 1" className={inputClass} disabled={!canAddKunde} />
+            placeholder="Strasse" className={inputClass} disabled={!canAddKunde} />
         </div>
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className={labelClass}>PLZ</label>
             <input type="text" value={zip} onChange={e => setZip(e.target.value)}
-              placeholder="8001" className={inputClass} disabled={!canAddKunde} />
+              placeholder="PLZ" className={inputClass} disabled={!canAddKunde} />
           </div>
           <div className="col-span-2">
             <label className={labelClass}>Ort</label>
             <input type="text" value={city} onChange={e => setCity(e.target.value)}
-              placeholder="Zürich" className={inputClass} disabled={!canAddKunde} />
+              placeholder="Ort" className={inputClass} disabled={!canAddKunde} />
           </div>
         </div>
       </div>
@@ -256,7 +256,7 @@ export default function NeuKundePage() {
       <div className={sectionClass}>
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">Notizen</h2>
         <textarea value={notizen} onChange={e => setNotizen(e.target.value)}
-          placeholder="Interne Notizen zu diesem Kunden..."
+          placeholder="Notizen"
           rows={3} className={`${inputClass} resize-none`} disabled={!canAddKunde} />
       </div>
 
