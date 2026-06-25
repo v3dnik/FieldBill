@@ -91,6 +91,8 @@ export type CompanyDoc = {
   companyId: string;
   ownerId: string;
   name: string;
+  ownerFirstName?: string;   // Inhaber Vorname (Einzelunternehmen)
+  ownerLastName?: string;    // Inhaber Nachname (Einzelunternehmen)
   phone: string;
   contactEmail: string;
   website?: string;

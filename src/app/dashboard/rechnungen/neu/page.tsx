@@ -188,13 +188,21 @@ function NeuRechnungInner() {
     pdf.setFillColor(26, 86, 219);
     pdf.rect(0, 0, pageWidth, 38, 'F');
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(22); pdf.setFont('helvetica', 'bold');
-    pdf.text(company?.name || '', 14, 14);
+    pdf.setFontSize(20); pdf.setFont('helvetica', 'bold');
+    pdf.text(company?.name || '', 14, 12);
+
+    let hy = 17;
+    const inhaber = [company?.ownerFirstName, company?.ownerLastName].filter(Boolean).join(' ').trim();
+    if (inhaber) {
+      pdf.setFontSize(8); pdf.setFont('helvetica', 'normal');
+      pdf.text(`Inhaber: ${inhaber}`, 14, hy);
+      hy += 4.5;
+    }
     pdf.setFontSize(9); pdf.setFont('helvetica', 'normal');
-    if (company?.address?.street) pdf.text(company.address.street, 14, 21);
-    if (company?.address?.city) pdf.text(`${company.address.zip} ${company.address.city}`, 14, 26);
-    if (company?.phone) pdf.text(company.phone, 14, 31);
-    if (company?.contactEmail) pdf.text(company.contactEmail, 14, 36);
+    if (company?.address?.street) { pdf.text(company.address.street, 14, hy); hy += 4.5; }
+    if (company?.address?.city) { pdf.text(`${company.address.zip} ${company.address.city}`, 14, hy); hy += 4.5; }
+    if (company?.phone) { pdf.text(company.phone, 14, hy); hy += 4.5; }
+    if (company?.contactEmail) { pdf.text(company.contactEmail, 14, hy); hy += 4.5; }
 
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
     pdf.text(isQuittung ? 'QUITTUNG' : 'RECHNUNG', pageWidth - 14, 14, { align: 'right' });

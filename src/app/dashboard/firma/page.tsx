@@ -17,6 +17,8 @@ export default function FirmenprofilPage() {
   const [isBoss, setIsBoss] = useState(false);
   const [companyId, setCompanyId] = useState<string>('');
   const [name, setName] = useState('');
+  const [ownerFirstName, setOwnerFirstName] = useState('');
+  const [ownerLastName, setOwnerLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -47,6 +49,8 @@ export default function FirmenprofilPage() {
         if (companySnap.exists()) {
           const c = companySnap.data() as CompanyDoc;
           setName(c.name || '');
+          setOwnerFirstName(c.ownerFirstName || '');
+          setOwnerLastName(c.ownerLastName || '');
           setPhone(c.phone || '');
           setContactEmail(c.contactEmail || '');
           setWebsite(c.website || '');
@@ -81,6 +85,8 @@ export default function FirmenprofilPage() {
     try {
       await updateDoc(doc(db, 'companies', companyId), {
         name: name.trim(),
+        ownerFirstName: ownerFirstName.trim(),
+        ownerLastName: ownerLastName.trim(),
         phone: phone.trim(),
         contactEmail: contactEmail.trim(),
         website: website.trim(),
@@ -134,6 +140,28 @@ export default function FirmenprofilPage() {
               <input type="text" required value={name} onChange={e => setName(e.target.value)}
                 className={inputClass} placeholder="z.B. Müller Umzüge GmbH" />
             </div>
+
+            {/* Inhaber — für Einzelunternehmen */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>
+                  Inhaber Vorname <span className="text-gray-400 text-xs">(optional)</span>
+                </label>
+                <input type="text" value={ownerFirstName} onChange={e => setOwnerFirstName(e.target.value)}
+                  className={inputClass} placeholder="z.B. Tomaž" />
+              </div>
+              <div>
+                <label className={labelClass}>
+                  Inhaber Nachname <span className="text-gray-400 text-xs">(optional)</span>
+                </label>
+                <input type="text" value={ownerLastName} onChange={e => setOwnerLastName(e.target.value)}
+                  className={inputClass} placeholder="z.B. Vodnik" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 dark:text-slate-500 -mt-2">
+              Wird auf Rechnungen unter dem Firmennamen angezeigt — empfohlen für Einzelunternehmen. Bei GmbH/AG leer lassen.
+            </p>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className={labelClass}>Telefon</label>
