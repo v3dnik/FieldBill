@@ -584,23 +584,23 @@ function NeuRechnungInner() {
           <div>
             <label className={labelClass}>Name / Firma <span className="text-red-500">*</span></label>
             <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
-              placeholder="z.B. Max Mustermann AG" className={inputClass} disabled={isReadOnly || limitReached} />
+              placeholder="Name / Firma" className={inputClass} disabled={isReadOnly || limitReached} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-3">
               <label className={labelClass}>Strasse</label>
               <input type="text" value={customerStreet} onChange={e => setCustomerStreet(e.target.value)}
-                placeholder="Musterstrasse 1" className={inputClass} disabled={isReadOnly || limitReached} />
+                placeholder="Strasse" className={inputClass} disabled={isReadOnly || limitReached} />
             </div>
             <div>
               <label className={labelClass}>PLZ</label>
               <input type="text" value={customerZip} onChange={e => setCustomerZip(e.target.value)}
-                placeholder="8001" className={inputClass} disabled={isReadOnly || limitReached} />
+                placeholder="PLZ" className={inputClass} disabled={isReadOnly || limitReached} />
             </div>
             <div className="col-span-2">
               <label className={labelClass}>Ort</label>
               <input type="text" value={customerCity} onChange={e => setCustomerCity(e.target.value)}
-                placeholder="Zürich" className={inputClass} disabled={isReadOnly || limitReached} />
+                placeholder="Ort" className={inputClass} disabled={isReadOnly || limitReached} />
             </div>
           </div>
           <div>
@@ -611,7 +611,7 @@ function NeuRechnungInner() {
               </span>
             </label>
             <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-              placeholder="kunde@beispiel.ch" className={inputClass} disabled={isReadOnly || limitReached} />
+              placeholder="E-Mail" className={inputClass} disabled={isReadOnly || limitReached} />
           </div>
         </div>
       </div>
@@ -642,12 +642,12 @@ function NeuRechnungInner() {
               <div>
                 <label className={labelSmClass}>Bezeichnung <span className="text-red-500">*</span></label>
                 <input type="text" value={pos.name} onChange={e => updatePosition(idx, 'name', e.target.value)}
-                  placeholder="z.B. Umzug pro Stunde" className={inputSmClass} disabled={isReadOnly || limitReached} />
+                  placeholder="Bezeichnung" className={inputSmClass} disabled={isReadOnly || limitReached} />
               </div>
               <div>
                 <label className={labelSmClass}>Beschreibung</label>
                 <input type="text" value={pos.description} onChange={e => updatePosition(idx, 'description', e.target.value)}
-                  placeholder="Zusätzliche Details (optional)" className={inputSmClass} disabled={isReadOnly || limitReached} />
+                  placeholder="Beschreibung" className={inputSmClass} disabled={isReadOnly || limitReached} />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -659,7 +659,7 @@ function NeuRechnungInner() {
                 <div>
                   <label className={labelSmClass}>Einheit</label>
                   <input type="text" value={pos.unit} onChange={e => updatePosition(idx, 'unit', e.target.value)}
-                    placeholder="Stunde" className={inputSmClass} disabled={isReadOnly || limitReached} />
+                    placeholder="Einheit" className={inputSmClass} disabled={isReadOnly || limitReached} />
                 </div>
                 <div>
                   <label className={labelSmClass}>Preis/Einheit (CHF)</label>
@@ -756,7 +756,7 @@ function NeuRechnungInner() {
           <div>
             <label className={labelClass}>Bemerkungen <span className="text-gray-400 text-xs">(optional)</span></label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="z.B. Vielen Dank für Ihren Auftrag."
+              placeholder="Bemerkungen"
               rows={3} className={`${inputClass} resize-none`} disabled={isReadOnly || limitReached} />
           </div>
         </div>
