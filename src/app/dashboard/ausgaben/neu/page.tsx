@@ -189,7 +189,7 @@ export default function NeuAusgabePage() {
             Beschreibung <span className="text-red-500">*</span>
           </label>
           <input type="text" value={beschreibung} onChange={e => setBeschreibung(e.target.value)}
-            placeholder="z.B. Abschreibung VW Crafter 2024" className={inputClass} disabled={!canCreateExpense} />
+            placeholder="Beschreibung" className={inputClass} disabled={!canCreateExpense} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
