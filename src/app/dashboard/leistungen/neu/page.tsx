@@ -99,7 +99,7 @@ export default function NeueLeistungPage() {
               Name <span className="text-red-500">*</span>
             </label>
             <input type="text" required value={name} onChange={e => setName(e.target.value)}
-              className={inputClass} placeholder="z.B. Umzug pro Stunde" />
+              className={inputClass} placeholder="Name" />
           </div>
 
           <div>
@@ -108,7 +108,7 @@ export default function NeueLeistungPage() {
             </label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
               className={`${inputClass} resize-none`}
-              placeholder="z.B. inklusive Verpackungsmaterial und 2 Mitarbeiter" />
+              placeholder="Beschreibung" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
