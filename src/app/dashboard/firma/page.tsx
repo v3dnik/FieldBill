@@ -138,7 +138,7 @@ export default function FirmenprofilPage() {
             <div>
               <label className={labelClass}>Firmenname <span className="text-red-500">*</span></label>
               <input type="text" required value={name} onChange={e => setName(e.target.value)}
-                className={inputClass} placeholder="z.B. Müller Umzüge GmbH" />
+                className={inputClass} placeholder="Firmenname" />
             </div>
 
             {/* Inhaber — für Einzelunternehmen */}
@@ -148,14 +148,14 @@ export default function FirmenprofilPage() {
                   Inhaber Vorname <span className="text-gray-400 text-xs">(optional)</span>
                 </label>
                 <input type="text" value={ownerFirstName} onChange={e => setOwnerFirstName(e.target.value)}
-                  className={inputClass} placeholder="z.B. Tomaž" />
+                  className={inputClass} placeholder="Vorname" />
               </div>
               <div>
                 <label className={labelClass}>
                   Inhaber Nachname <span className="text-gray-400 text-xs">(optional)</span>
                 </label>
                 <input type="text" value={ownerLastName} onChange={e => setOwnerLastName(e.target.value)}
-                  className={inputClass} placeholder="z.B. Vodnik" />
+                  className={inputClass} placeholder="Nachname" />
               </div>
             </div>
             <p className="text-xs text-gray-400 dark:text-slate-500 -mt-2">
@@ -166,18 +166,18 @@ export default function FirmenprofilPage() {
               <div>
                 <label className={labelClass}>Telefon</label>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-                  className={inputClass} placeholder="+41 79 123 45 67" />
+                  className={inputClass} placeholder="Telefon" />
               </div>
               <div>
                 <label className={labelClass}>E-Mail</label>
                 <input type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)}
-                  className={inputClass} placeholder="info@firma.ch" />
+                  className={inputClass} placeholder="E-Mail" />
               </div>
             </div>
             <div>
               <label className={labelClass}>Website</label>
               <input type="url" value={website} onChange={e => setWebsite(e.target.value)}
-                className={inputClass} placeholder="https://www.firma.ch" />
+                className={inputClass} placeholder="Website" />
             </div>
           </div>
         </section>
@@ -189,18 +189,18 @@ export default function FirmenprofilPage() {
             <div>
               <label className={labelClass}>Strasse und Nr.</label>
               <input type="text" value={street} onChange={e => setStreet(e.target.value)}
-                className={inputClass} placeholder="Bahnhofstrasse 1" />
+                className={inputClass} placeholder="Strasse und Nr." />
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>PLZ</label>
                 <input type="text" value={zip} onChange={e => setZip(e.target.value)}
-                  className={inputClass} placeholder="8001" />
+                  className={inputClass} placeholder="PLZ" />
               </div>
               <div className="col-span-2">
                 <label className={labelClass}>Ort</label>
                 <input type="text" value={city} onChange={e => setCity(e.target.value)}
-                  className={inputClass} placeholder="Zürich" />
+                  className={inputClass} placeholder="Ort" />
               </div>
             </div>
             <div>
@@ -270,7 +270,7 @@ export default function FirmenprofilPage() {
                   MwSt-Nummer <span className="text-red-500">*</span>
                 </label>
                 <input type="text" value={vatNumber} onChange={e => setVatNumber(e.target.value)}
-                  className={`${inputClass} font-mono`} placeholder="CHE-123.456.789 MWST" />
+                  className={`${inputClass} font-mono`} placeholder="MwSt-Nummer" />
                 <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
                   MwSt 8.1% wird automatisch auf alle Rechnungen angewendet.
                 </p>
@@ -294,18 +294,18 @@ export default function FirmenprofilPage() {
             <div>
               <label className={labelClass}>Bankname</label>
               <input type="text" value={bankName} onChange={e => setBankName(e.target.value)}
-                className={inputClass} placeholder="z.B. UBS Switzerland AG" />
+                className={inputClass} placeholder="Bankname" />
             </div>
             <div>
               <label className={labelClass}>IBAN</label>
               <input type="text" value={iban} onChange={e => setIban(e.target.value)}
-                className={`${inputClass} font-mono`} placeholder="CH93 0076 2011 6238 5295 7" />
+                className={`${inputClass} font-mono`} placeholder="IBAN" />
               <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">Normaler IBAN für Banküberweisungen.</p>
             </div>
             <div>
               <label className={labelClass}>QR-IBAN <span className="text-blue-500">⭐</span></label>
               <input type="text" value={qrIban} onChange={e => setQrIban(e.target.value)}
-                className={`${inputClass} font-mono`} placeholder="CH44 3199 9123 0008 8901 2" />
+                className={`${inputClass} font-mono`} placeholder="QR-IBAN" />
               <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
                 Spezielle IBAN für Swiss QR-Rechnungen. Kostenlos bei Ihrer Bank beantragen.
               </p>
